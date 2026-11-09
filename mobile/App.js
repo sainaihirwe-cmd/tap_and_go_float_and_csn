@@ -1162,7 +1162,7 @@ export default function App() {
         </View>
         {profileOpen && <ProfileEditor role={role} profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
         {!profileOpen && <View style={styles.staffTabs}>
-          {(role === 'superagent' ? [['home', 'Home'], ['requests', 'Deletion requests']] : [['home', 'Home'], ['messages', 'Messages']]).map(([key, label]) =>
+          {(role === 'superagent' ? [['home', 'Home'], ['messages', 'Admin chat'], ['requests', 'Deletion requests']] : [['home', 'Home'], ['messages', 'Messages']]).map(([key, label]) =>
             <TouchableOpacity key={key} accessibilityRole="button" accessibilityState={{ selected: staffTab === key }}
               onPress={() => setStaffTab(key)} style={[styles.staffTab, staffTab === key && styles.staffTabActive]}>
               <Text style={[styles.staffTabText, staffTab === key && styles.staffTabTextActive]}>{translate(commuterLanguage, label)}</Text>
@@ -1316,6 +1316,9 @@ function FloatBadge({ agent, language = 'en' }) {
 function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [agents, setAgents] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [inboxMessages, setInboxMessages] = useState([]);
+  const [inboxDraft, setInboxDraft] = useState('');
+  const [inboxSending, setInboxSending] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState('');
@@ -1328,12 +1331,14 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
-    const [agentRows, deletionRequests] = await Promise.all([
+    const [agentRows, deletionRequests, inbox] = await Promise.all([
       api('/api/agents'),
-      api('/api/superagent/deletion-requests')
+      api('/api/superagent/deletion-requests'),
+      api('/api/superagent/inbox')
     ]);
     setAgents(agentRows);
     setRequests(deletionRequests);
+    setInboxMessages(inbox.messages || []);
   }
 
   useEffect(() => {
@@ -1341,13 +1346,15 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
     let socket;
     const load = async () => {
       try {
-        const [agentRows, deletionRequests] = await Promise.all([
+        const [agentRows, deletionRequests, inbox] = await Promise.all([
           api('/api/agents'),
-          api('/api/superagent/deletion-requests')
+          api('/api/superagent/deletion-requests'),
+          api('/api/superagent/inbox')
         ]);
         if (active) {
           setAgents(agentRows);
           setRequests(deletionRequests);
+          setInboxMessages(inbox.messages || []);
         }
       } catch (problem) {
         if (active) onMessage(translate(language, problem.message));
@@ -1358,6 +1365,12 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
     SecureStore.getItemAsync('mobile_token').then(token => {
       if (!active || !token) return;
       socket = io(API, { auth: { token }, reconnection: true });
+      socket.on('superagent:inbox-message', event => {
+        setInboxMessages(current => [...current.filter(item => item.sentAt !== event.message.sentAt), event.message].slice(-200));
+        if (event.message?.sender === 'admin') {
+          onMessage(translate(language, 'New message from your administrator.'));
+        }
+      });
       socket.on('superagent:deletion-request-updated', request => {
         setRequests(current => [request, ...current.filter(item => item._id !== request._id)]);
         onMessage(translate(language, request.status === 'approved' ? 'Admin approved the agent deletion request.' : 'Admin rejected the agent deletion request.'));
@@ -1370,6 +1383,23 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
       socket?.disconnect();
     };
   }, []);
+
+  async function sendInboxMessage() {
+    const text = inboxDraft.trim();
+    if (!text || inboxSending) return;
+    setInboxSending(true);
+    try {
+      const result = await api('/api/superagent/inbox', {
+        method: 'POST', body: JSON.stringify({ text })
+      });
+      setInboxMessages(current => [...current.filter(item => item.sentAt !== result.message.sentAt), result.message].slice(-200));
+      setInboxDraft('');
+    } catch (problem) {
+      onMessage(translate(language, problem.message));
+    } finally {
+      setInboxSending(false);
+    }
+  }
 
   function startCreate() {
     setEditing(null);
@@ -1489,7 +1519,16 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
         <Text style={styles.cardTitle}>{translate(language, 'No agents assigned yet')}</Text>
         <Text style={styles.cardSub}>{translate(language, 'Ask an administrator to assign agents to your Superagent account.')}</Text>
       </View>}
-    </> : <>
+    </> : activeTab === 'messages' ? <DistributorInboxPanel
+      language={language}
+      messages={inboxMessages}
+      draft={inboxDraft}
+      onDraftChange={setInboxDraft}
+      onSend={sendInboxMessage}
+      sending={inboxSending}
+      ownSender="superagent"
+      title="Messages with administrator"
+    /> : <>
       <Text style={styles.sectionTitle}>{translate(language, 'Deletion request history')}</Text>
       {requests.map(request => <View key={request._id} style={styles.panel}>
         <View style={styles.row}>
@@ -1615,12 +1654,12 @@ function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, on
   </View>;
 }
 
-function DistributorInboxPanel({ language, messages, draft, onDraftChange, onSend, sending }) {
+function DistributorInboxPanel({ language, messages, draft, onDraftChange, onSend, sending, ownSender = 'distributor', title = 'Operations inbox' }) {
   return <View style={styles.panel}>
-    <Text style={styles.cardTitle}>{translate(language, 'Operations inbox')}</Text>
+    <Text style={styles.cardTitle}>{translate(language, title)}</Text>
     <View style={styles.conversation}>
-      {messages.slice(-20).map((item, index) => <View key={`${item.sentAt}-${index}`} style={[styles.chatBubble, item.sender === 'distributor' ? styles.chatBubbleMine : styles.chatBubbleOther]}>
-        <Text style={styles.chatSender}>{item.sender === 'distributor' ? translate(language, 'You') : item.senderName || translate(language, 'Admin')}</Text>
+      {messages.slice(-20).map((item, index) => <View key={`${item.sentAt}-${index}`} style={[styles.chatBubble, item.sender === ownSender ? styles.chatBubbleMine : styles.chatBubbleOther]}>
+        <Text style={styles.chatSender}>{item.sender === ownSender ? translate(language, 'You') : item.senderName || translate(language, 'Admin')}</Text>
         <Text style={styles.chatText}>{item.text}</Text>
         <Text style={styles.chatSender}>{item.sentAt ? new Date(item.sentAt).toLocaleString() : ''}</Text>
       </View>)}
