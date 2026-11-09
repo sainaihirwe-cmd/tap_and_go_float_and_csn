@@ -9,7 +9,7 @@ const multer = require('multer');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
 const {getRoute}=require('./routing');
-const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models');
+const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models');
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@tapandgo.local';
 const adminPassword = process.env.ADMIN_PASSWORD || 'TapGoDev2026!';
 const authSecret = process.env.AUTH_SECRET || 'local-development-secret-change-before-deploying';
@@ -521,6 +521,11 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
     if (!['agent', 'distributor', 'superagent'].includes(role)) return res.status(400).json({ error: 'Choose an agent, distributor, or Superagent role.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return res.status(400).json({ error: 'Enter a valid email address.' });
     if (password.length < 12 || password.length > 1024) return res.status(400).json({ error: 'Set an initial password of at least 12 characters.' });
+    const [adminExists, commuterExists] = await Promise.all([
+      AdminProfile.exists({ email }),
+      CommuterAccount.exists({ email })
+    ]);
+    if (adminExists || commuterExists) return res.status(409).json({ error: 'This email address is already in use.' });
     if (role === 'superagent') {
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       const managedAgentIds = Array.isArray(req.body?.managedAgentIds) ? [...new Set(req.body.managedAgentIds.map(String))] : [];
@@ -566,6 +571,39 @@ app.patch('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
     const account = await MobileAccount.findById(req.params.id);
     if (!account) return res.status(404).json({ error: 'Mobile account not found.' });
     const updates = {};
+    if (account.role === 'superagent') {
+      if (req.body?.name !== undefined) {
+        if (typeof req.body.name !== 'string' || !req.body.name.trim() || req.body.name.trim().length > 80) {
+          return res.status(400).json({ error: 'Superagent name must be between 1 and 80 characters.' });
+        }
+        updates.name = req.body.name.trim();
+      }
+      if (req.body?.email !== undefined) {
+        const email = String(req.body.email || '').trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+          return res.status(400).json({ error: 'Enter a valid sign-in email address.' });
+        }
+        if (email !== account.email) {
+          const [adminExists, mobileExists, commuterExists] = await Promise.all([
+            AdminProfile.exists({ email }),
+            MobileAccount.exists({ email, _id: { $ne: account._id } }),
+            CommuterAccount.exists({ email })
+          ]);
+          if (adminExists || mobileExists || commuterExists) {
+            return res.status(409).json({ error: 'This email address is already in use.' });
+          }
+        }
+        updates.email = email;
+      }
+      if (req.body?.password !== undefined) {
+        if (typeof req.body.password !== 'string' || req.body.password.length < 12 || req.body.password.length > 1024) {
+          return res.status(400).json({ error: 'Password must be at least 12 characters.' });
+        }
+        updates.passwordHash = hashPassword(req.body.password);
+      }
+    } else if (req.body?.name !== undefined || req.body?.email !== undefined || req.body?.password !== undefined) {
+      return res.status(400).json({ error: 'Only Superagent account details can be edited here.' });
+    }
     if (req.body?.active !== undefined) {
       if (typeof req.body.active !== 'boolean') return res.status(400).json({ error: 'Set active to true or false.' });
       if (req.body.active && account.role === 'superagent') {
@@ -595,6 +633,19 @@ app.patch('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
     await account.save();
     io.in(`mobile:${account._id}`).disconnectSockets(true);
     res.json({ id: String(account._id), role: account.role, email: account.email, name: account.name, active: account.active });
+  } catch (error) { apiError(res, error); }
+});
+app.delete('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
+  try {
+    const account = await MobileAccount.findOne({ _id: req.params.id, role: 'superagent' });
+    if (!account) return res.status(404).json({ error: 'Superagent account not found.' });
+    if (await SuperagentDeletionRequest.exists({ superagent: account._id, status: 'pending' })) {
+      return res.status(409).json({ error: 'Review pending agent deletion requests before removing this Superagent.' });
+    }
+    await SuperagentInbox.deleteOne({ superagent: account._id });
+    await account.deleteOne();
+    io.in(`mobile:${account._id}`).disconnectSockets(true);
+    res.json({ id: String(account._id), deleted: true });
   } catch (error) { apiError(res, error); }
 });
 
@@ -941,6 +992,69 @@ app.post('/api/admin/distributor-inbox/:distributorId/messages', async (req, res
     const event = { distributorId: req.params.distributorId, message };
     io.to(`mobile:${account._id}`).emit('distributor:inbox-message', event);
     broadcast('distributor:inbox-message', event);
+    res.status(201).json({ message, updatedAt: inbox.updatedAt });
+  } catch (error) { apiError(res, error); }
+});
+
+app.get('/api/admin/superagent-inbox', async (_req, res) => {
+  try {
+    const [accounts, inboxes] = await Promise.all([
+      MobileAccount.find({ role: 'superagent' }).select('name email active').lean(),
+      SuperagentInbox.find().sort({ updatedAt: -1 }).lean()
+    ]);
+    const inboxBySuperagent = new Map(inboxes.map(inbox => [String(inbox.superagent), inbox]));
+    res.json(accounts.map(account => {
+      const inbox = inboxBySuperagent.get(String(account._id));
+      return {
+        superagent: { _id: account._id, name: account.name, email: account.email, active: account.active },
+        messages: inbox?.messages || [],
+        updatedAt: inbox?.updatedAt || null
+      };
+    }).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)));
+  } catch (error) { apiError(res, error); }
+});
+
+app.get('/api/superagent/inbox', async (req, res) => {
+  try {
+    const inbox = await SuperagentInbox.findOne({ superagent: req.mobile.account._id }).select('messages updatedAt').lean();
+    res.json(inbox || { messages: [], updatedAt: null });
+  } catch (error) { apiError(res, error); }
+});
+
+app.post('/api/superagent/inbox', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters.' });
+    const account = req.mobile.account;
+    const message = { sender: 'superagent', senderName: account.name, text, sentAt: new Date() };
+    const inbox = await SuperagentInbox.findOneAndUpdate(
+      { superagent: account._id },
+      { $push: { messages: { $each: [message], $slice: -200 } } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    ).select('messages updatedAt');
+    const event = { superagentId: String(account._id), message };
+    broadcast('superagent:inbox-message', event);
+    io.to(`mobile:${account._id}`).emit('superagent:inbox-message', event);
+    res.status(201).json({ message, updatedAt: inbox.updatedAt });
+  } catch (error) { apiError(res, error); }
+});
+
+app.post('/api/admin/superagent-inbox/:superagentId/messages', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters.' });
+    if (!mongoose.isValidObjectId(req.params.superagentId)) return res.status(404).json({ error: 'Superagent not found.' });
+    const account = await MobileAccount.findOne({ _id: req.params.superagentId, role: 'superagent' }).select('name active');
+    if (!account) return res.status(404).json({ error: 'Superagent not found.' });
+    const message = { sender: 'admin', senderName: req.admin.name || 'Operations', text, sentAt: new Date() };
+    const inbox = await SuperagentInbox.findOneAndUpdate(
+      { superagent: account._id },
+      { $push: { messages: { $each: [message], $slice: -200 } } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    ).select('messages updatedAt');
+    const event = { superagentId: String(account._id), message };
+    io.to(`mobile:${account._id}`).emit('superagent:inbox-message', event);
+    broadcast('superagent:inbox-message', event);
     res.status(201).json({ message, updatedAt: inbox.updatedAt });
   } catch (error) { apiError(res, error); }
 });
