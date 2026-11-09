@@ -14,7 +14,8 @@ import { io } from 'socket.io-client';
 
 const expoHost = Constants.expoConfig?.hostUri?.split(':')[0] ||
   Constants.manifest?.debuggerHost?.split(':')[0];
-const API = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '') ||
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiBaseUrl || '';
+const API = configuredApiUrl.replace(/\/$/, '') ||
   (expoHost ? `http://${expoHost}:3000` :
     Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000');
 const TRACKING_TASK = 'tap-and-go-location';
@@ -339,10 +340,14 @@ async function api(path, options = {}) {
   const { token: suppliedToken, ...request } = options;
   const token = suppliedToken ?? await SecureStore.getItemAsync('mobile_token');
   const isFormData = typeof FormData !== 'undefined' && request.body instanceof FormData;
+  const isAuthenticationRequest = /^\/api\/auth\/(?:mobile\/login|commuter\/(?:login|register))$/.test(path);
+  const controller = isAuthenticationRequest ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
   let response;
   try {
     response = await fetch(`${API}${path}`, {
       ...request,
+      ...(controller ? { signal: controller.signal } : {}),
       headers: {
         ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -350,7 +355,10 @@ async function api(path, options = {}) {
       }
     });
   } catch (problem) {
+    if (problem.name === 'AbortError') throw new Error('Sign-in timed out. Check the server connection and try again.');
     throw new Error(`Cannot reach the Tap & Go server at ${API}. Connect your phone and computer to the same Wi-Fi, or set EXPO_PUBLIC_API_URL to the computer's LAN address. ${problem.message}`);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
   const data = await response.json().catch(() => ({}));
   if (response.status === 401 && token && !path.includes('/auth/mobile/login')) {
@@ -486,14 +494,6 @@ export default function App() {
   };
   const profile = account?.entity;
   const profileId = profile?._id;
-
-  const loadAccount = useCallback(async token => {
-    const value = await api('/api/auth/mobile/me', token ? { token } : {});
-    setAccount(value);
-    setRole(value.role);
-    setFloatBalance(String(value.entity.floatBalance ?? 0));
-    return value;
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -695,9 +695,13 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({ email: email.trim(), password })
       });
+      if (!result.token || !result.account || !result.entity) throw new Error('Sign-in service returned incomplete account details. Please try again.');
       await SecureStore.setItemAsync('mobile_token', result.token);
       await SecureStore.setItemAsync('mobile_expires_at', String(result.expiresAt));
-      const value = await loadAccount(result.token);
+      const value = { ...result.account, entity: result.entity };
+      setAccount(value);
+      setRole(value.role);
+      if (value.entity.floatBalance !== undefined) setFloatBalance(String(value.entity.floatBalance));
       setPassword('');
       setLoginError('');
       setStaffLoginOpen(false);
@@ -719,9 +723,11 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({ name: commuterName.trim(), email: email.trim(), password })
       });
+      if (!result.token || !result.account || !result.entity) throw new Error('Account service returned incomplete account details. Please try again.');
       await SecureStore.setItemAsync('mobile_token', result.token);
       await SecureStore.setItemAsync('mobile_expires_at', String(result.expiresAt));
-      const value = await loadAccount(result.token);
+      const value = { ...result.account, entity: result.entity };
+      setAccount(value);
       setRole('commuter');
       setPassword('');
       setLoginError('');
