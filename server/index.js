@@ -178,6 +178,22 @@ function passwordMatchesHash(password, storedHash) {
   const actual = crypto.scryptSync(password, salt, expected.length);
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
+async function mobileAccountView(account) {
+  const entity = account.role === 'commuter'
+    ? { name: account.name }
+    : account.role === 'agent'
+      ? await Agent.findById(account.agent).select('name phone place zone location floatBalance floatReference safeThreshold liquidityStatus status agent_id shiftStartedAt shiftSeconds').lean()
+      : account.role === 'distributor'
+        ? await Distributor.findById(account.distributor).select('name phone place location status distributor_id').lean()
+        : { name: account.name };
+  if (!entity) throw Object.assign(new Error('The mobile account is no longer linked to a profile.'), { status: 401 });
+  return {
+    id: String(account._id),
+    email: account.email,
+    role: account.role,
+    entity: account.role === 'agent' ? { ...entity, lowFloatThreshold: lowFloatThreshold(entity) } : entity
+  };
+}
 async function backfillProfilePasswordHashes() {
   const accounts = await MobileAccount.find({ passwordHash: { $exists: true } })
     .select('role agent distributor +passwordHash')
@@ -264,10 +280,12 @@ app.post('/api/auth/mobile/login', async (req, res) => {
       : await Distributor.exists({ _id: account.distributor, archivedAt: null }));
     if (!profileExists) return res.status(401).json({ error: 'This profile is archived. Contact your administrator.' });
     const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+    const accountView = await mobileAccountView(account);
     res.json({
       token: issueMobileSession(account, expiresAt),
       expiresAt,
-      account: { id: String(account._id), email: account.email, role: account.role }
+      account: { id: accountView.id, email: accountView.email, role: accountView.role },
+      entity: accountView.entity
     });
   } catch (error) { apiError(res, error); }
 });
@@ -283,10 +301,12 @@ app.post('/api/auth/commuter/register', async (req, res) => {
     if (await MobileAccount.exists({ email })) return res.status(409).json({ error: 'This email is already used by an administrator-created Agent or Distributor account.' });
     const commuter = await CommuterAccount.create({ name, email, passwordHash: hashPassword(password) });
     const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+    const accountView = await mobileAccountView(commuter);
     res.status(201).json({
       token: issueMobileSession({ _id: commuter._id, role: 'commuter', sessionVersion: commuter.sessionVersion }, expiresAt),
       expiresAt,
-      account: { id: String(commuter._id), email: commuter.email, role: 'commuter' }
+      account: { id: accountView.id, email: accountView.email, role: accountView.role },
+      entity: accountView.entity
     });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ error: 'An account with this email already exists. Sign in instead.' });
@@ -300,10 +320,12 @@ app.post('/api/auth/commuter/login', async (req, res) => {
     const commuter = await CommuterAccount.findOne({ email, active: true }).select('+passwordHash');
     if (!commuter || !passwordMatchesHash(password, commuter.passwordHash)) return res.status(401).json({ error: 'Email or password is incorrect.' });
     const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+    const accountView = await mobileAccountView(commuter);
     res.json({
       token: issueMobileSession({ _id: commuter._id, role: 'commuter', sessionVersion: commuter.sessionVersion }, expiresAt),
       expiresAt,
-      account: { id: String(commuter._id), email: commuter.email, role: 'commuter' }
+      account: { id: accountView.id, email: accountView.email, role: accountView.role },
+      entity: accountView.entity
     });
   } catch (error) { apiError(res, error); }
 });
@@ -313,19 +335,7 @@ app.get('/api/auth/mobile/me', async (req, res, next) => {
   if (!session || !['agent', 'distributor', 'superagent', 'commuter'].includes(session.role)) return res.status(401).json({ error: 'Sign in with an active mobile account to continue.' });
   return requireMobile(session.role)(req, res, async () => {
     try {
-      const account = req.mobile.account;
-      const entity = session.role === 'commuter'
-        ? { name: account.name }
-        : session.role === 'agent'
-          ? await Agent.findById(account.agent).select('name phone place zone location floatBalance floatReference safeThreshold liquidityStatus status agent_id shiftStartedAt shiftSeconds').lean()
-          : session.role === 'distributor'
-            ? await Distributor.findById(account.distributor).select('name phone place location status distributor_id').lean()
-            : { name: account.name };
-      if (!entity) return res.status(401).json({ error: 'The mobile account is no longer linked to a profile.' });
-      res.json({
-        id: String(account._id), email: account.email, role: session.role,
-        entity: account.role === 'agent' ? { ...entity, lowFloatThreshold: lowFloatThreshold(entity) } : entity
-      });
+      res.json(await mobileAccountView(req.mobile.account));
     } catch (error) { apiError(res, error); }
   });
 });
@@ -2202,7 +2212,7 @@ async function startServer() {
   if (backfilled.agents || backfilled.distributors) {
     console.log(`Backfilled password hashes for ${backfilled.agents} agent and ${backfilled.distributors} distributor profiles.`);
   }
-  server.listen(port,()=>console.log(`Tap & Go operations server listening on http://localhost:${port}`));
+  server.listen(port, '0.0.0.0',()=>console.log(`Tap & Go operations server listening on port ${port} (all network interfaces)`));
 }
 
 startServer().catch(error => {
