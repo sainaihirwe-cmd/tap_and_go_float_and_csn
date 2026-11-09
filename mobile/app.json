@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Tap & Go Network",
+    "slug": "tap-and-go-network",
+    "scheme": "tapandgo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tapandgo.network",
+      "infoPlist": { "UIBackgroundModes": ["location"] }
+    },
+    "android": {
+      "package": "com.tapandgo.network",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION"]
+    },
+    "plugins": [
+      ["expo-location", {
+        "locationWhenInUsePermission": "Tap & Go uses your location to find nearby agents and share your agent or distributor position.",
+        "locationAlwaysAndWhenInUsePermission": "Background location keeps agent float alerts and distributor dispatch locations current while you work.",
+        "isIosBackgroundLocationEnabled": true,
+        "isAndroidBackgroundLocationEnabled": true,
+        "isAndroidForegroundServiceEnabled": true
+      }]
+    ],
+    "extra": { "apiBaseUrl": "" }
+  }
+}
