@@ -5,7 +5,7 @@ const demoAgents = [
   ['Maya Patel','Soho',-0.133,51.514,'critical',18],['James Cole','Waterloo',-0.113,51.503,'critical',24],['Ella Brooks',"King’s Cross",-0.123,51.531,'critical',32],['Oliver Reed','Shoreditch',-0.078,51.525,'warning',86],['Aisha Khan','Paddington',-0.176,51.516,'warning',110],['Noah Wright','London Bridge',-0.087,51.505,'warning',94],['Isla Green','Covent Garden',-0.123,51.512,'healthy',640],['Leo Turner','Islington',-0.103,51.537,'healthy',820],['Sofia Ali','Victoria',-0.144,51.496,'healthy',520],['Theo James','Camden',-0.143,51.539,'healthy',735]
 ].map(([name,place,lon,lat,risk,floatBalance],i)=>({_id:`demo-${i}`,name,place,zone:i<3?'Zone 1':'Zone 2',location:{type:'Point',coordinates:[lon,lat]},floatBalance,status:risk==='critical'?'at_risk':'active',demoRisk:risk}));
 const demoDistributors=[{_id:'d1',name:'Daniel Carter',location:{coordinates:[-0.139,51.516]},status:'available'},{_id:'d2',name:'Priya Sharma',location:{coordinates:[-0.108,51.500]},status:'available'},{_id:'d3',name:'Marcus Lee',location:{coordinates:[-0.087,51.526]},status:'available'}];
-const mapNames={overview:'Overview',agents:'Agent network',distributors:'Distributors',dispatch:'Dispatch',agentMessages:'Agent inbox',distributorInbox:'Distributor inbox',superagentRequests:'Superagent deletion requests',commuters:'Commuter map',liquidity:'Liquidity insights',reports:'Reports',settings:'Settings'};
+const mapNames={overview:'Overview',agents:'Agent network',distributors:'Distributors',dispatch:'Dispatch',agentMessages:'Agent inbox',distributorInbox:'Distributor inbox',superagentMessages:'Superagent chat',superagentRequests:'Superagent deletion requests',commuters:'Commuter map',liquidity:'Liquidity insights',reports:'Reports',settings:'Settings'};
 const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(value||0);
 const formatShiftDuration=seconds=>{
   const minutes=Math.floor((Number(seconds)||0)/60);
@@ -33,7 +33,7 @@ async function responseData(response,service){
   }
 }
 
-function Icon({name}){const paths={overview:'▦',agents:'◎',distributors:'⇄',dispatch:'⌁',agentMessages:'✉',distributorInbox:'▤',superagentRequests:'⚑',commuters:'♙',liquidity:'◉',reports:'▤',settings:'⚙'};return <span className="nav-icon" aria-hidden="true">{paths[name]||'◦'}</span>}
+function Icon({name}){const paths={overview:'▦',agents:'◎',distributors:'⇄',dispatch:'⌁',agentMessages:'✉',distributorInbox:'▤',superagentMessages:'✉',superagentRequests:'⚑',commuters:'♙',liquidity:'◉',reports:'▤',settings:'⚙'};return <span className="nav-icon" aria-hidden="true">{paths[name]||'◦'}</span>}
 function MapArtwork({agents,distributors,onSelect}){
   const project=([lon,lat])=>({x:((lon+0.29)/0.27)*780,y:((51.57-lat)/0.19)*385});
   const streets=['M-10 66L793 304','M20 365L732 10','M45-10L520 395','M256-10L117 390','M591-10L388 390','M780 112L-10 207','M676 395L99-10','M0 130L787 226','M337-10L742 385','M-10 333L791 67'];
@@ -49,7 +49,7 @@ function MapArtwork({agents,distributors,onSelect}){
 function Dashboard({admin,onLogout,onProfileSaved}){
   const [clock,setClock]=useState(()=>new Date());
   const [sessionRemaining,setSessionRemaining]=useState(()=>Math.max(0,Math.ceil((Number(admin.expiresAt)-Date.now())/1000))||0);
-  const [view,setView]=useState('overview');const [agents,setAgents]=useState(demoAgents);const [distributors,setDistributors]=useState(demoDistributors);const [alerts,setAlerts]=useState([]);const [agentMessages,setAgentMessages]=useState([]);const [distributorConversations,setDistributorConversations]=useState([]);const [superagentDeletionRequests,setSuperagentDeletionRequests]=useState([]);const [dispatches,setDispatches]=useState([]);const [completedDispatches,setCompletedDispatches]=useState([]);const [summary,setSummary]=useState(null);const [heatmap,setHeatmap]=useState(null);const [analytics,setAnalytics]=useState(null);const [connected,setConnected]=useState(false);const [modal,setModal]=useState(false);const [selectedAgent,setSelectedAgent]=useState('');const [toast,setToast]=useState('');const [mapFilter,setMapFilter]=useState('all');const [popup,setPopup]=useState(null);const [loading,setLoading]=useState(true);
+  const [view,setView]=useState('overview');const [agents,setAgents]=useState(demoAgents);const [distributors,setDistributors]=useState(demoDistributors);const [alerts,setAlerts]=useState([]);const [agentMessages,setAgentMessages]=useState([]);const [distributorConversations,setDistributorConversations]=useState([]);const [superagentConversations,setSuperagentConversations]=useState([]);const [superagentDeletionRequests,setSuperagentDeletionRequests]=useState([]);const [dispatches,setDispatches]=useState([]);const [completedDispatches,setCompletedDispatches]=useState([]);const [summary,setSummary]=useState(null);const [heatmap,setHeatmap]=useState(null);const [analytics,setAnalytics]=useState(null);const [connected,setConnected]=useState(false);const [modal,setModal]=useState(false);const [selectedAgent,setSelectedAgent]=useState('');const [toast,setToast]=useState('');const [mapFilter,setMapFilter]=useState('all');const [popup,setPopup]=useState(null);const [loading,setLoading]=useState(true);
   const [settlements,setSettlements]=useState([]);
   const [dispatching,setDispatching]=useState(false);
   const [dispatchInstructions,setDispatchInstructions]=useState('');
@@ -75,8 +75,8 @@ function Dashboard({admin,onLogout,onProfileSaved}){
   },[admin.expiresAt,onLogout]);
   const refresh=useCallback(async()=>{
     try{
-      const [health,agentData,alertData,messageData,distributorInboxData,deleteRequestData,dispatchData,completedDispatchData,summaryData,heatmapData,analyticsData,distributorData,settlementData]=await Promise.all(['/api/health','/api/agents','/api/alerts?state=open','/api/agent-messages','/api/admin/distributor-inbox','/api/admin/superagent-deletion-requests','/api/dispatches','/api/dispatches?status=completed','/api/summary','/api/liquidity/heatmap?hours=24','/api/analytics?days=7','/api/distributors','/api/float-settlements'].map(url=>apiFetch(url).then(r=>{if(!r.ok)throw Error('API unavailable');return r.json()})));
-      if(health.database==='connected'){setConnected(true);setAgents(agentData);setAlerts(alertData);setAgentMessages(messageData);setDistributorConversations(distributorInboxData);setSuperagentDeletionRequests(deleteRequestData);setDispatches(dispatchData);setCompletedDispatches(completedDispatchData);setSummary(summaryData);setHeatmap(heatmapData);setAnalytics(analyticsData);setDistributors(distributorData);setSettlements(settlementData)}
+      const [health,agentData,alertData,messageData,distributorInboxData,superagentInboxData,deleteRequestData,dispatchData,completedDispatchData,summaryData,heatmapData,analyticsData,distributorData,settlementData]=await Promise.all(['/api/health','/api/agents','/api/alerts?state=open','/api/agent-messages','/api/admin/distributor-inbox','/api/admin/superagent-inbox','/api/admin/superagent-deletion-requests','/api/dispatches','/api/dispatches?status=completed','/api/summary','/api/liquidity/heatmap?hours=24','/api/analytics?days=7','/api/distributors','/api/float-settlements'].map(url=>apiFetch(url).then(r=>{if(!r.ok)throw Error('API unavailable');return r.json()})));
+      if(health.database==='connected'){setConnected(true);setAgents(agentData);setAlerts(alertData);setAgentMessages(messageData);setDistributorConversations(distributorInboxData);setSuperagentConversations(superagentInboxData);setSuperagentDeletionRequests(deleteRequestData);setDispatches(dispatchData);setCompletedDispatches(completedDispatchData);setSummary(summaryData);setHeatmap(heatmapData);setAnalytics(analyticsData);setDistributors(distributorData);setSettlements(settlementData)}
       else setConnected(false);
     }catch{setConnected(false)}finally{setLoading(false)}
   },[]);
@@ -149,6 +149,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
     });
     socket.on('dispatch:message',event=>{setDispatches(current=>current.map(item=>item._id===event.dispatchId?{...item,messages:[...(item.messages||[]).filter(message=>message.sentAt!==event.message.sentAt),event.message]}:item));setToast(`${event.message.senderName}: ${event.message.text}`)});
     socket.on('distributor:inbox-message',event=>{setDistributorConversations(current=>current.map(conversation=>String(conversation.distributor?._id)===String(event.distributorId)?{...conversation,messages:[...(conversation.messages||[]).filter(message=>message.sentAt!==event.message.sentAt),event.message],updatedAt:event.message.sentAt}:conversation));setToast(`${event.message.senderName}: ${event.message.text}`)});
+    socket.on('superagent:inbox-message',event=>{setSuperagentConversations(current=>current.map(conversation=>String(conversation.superagent?._id)===String(event.superagentId)?{...conversation,messages:[...(conversation.messages||[]).filter(message=>message.sentAt!==event.message.sentAt),event.message],updatedAt:event.message.sentAt}:conversation));setToast(`${event.message.senderName}: ${event.message.text}`)});
     socket.on('superagent:deletion-request',request=>{setSuperagentDeletionRequests(current=>[request,...current.filter(item=>item._id!==request._id)]);setToast(`${request.superagent?.name||request.superagent?.email||'Superagent'} requested deletion of ${request.agent?.name||'an agent'}: ${request.reason}`)});
     socket.on('superagent:deletion-request-updated',request=>{setSuperagentDeletionRequests(current=>[request,...current.filter(item=>item._id!==request._id)]);setToast(`${request.agent?.name||'Agent'} deletion request ${request.status}.`)});
     socket.connect();
@@ -182,6 +183,16 @@ function Dashboard({admin,onLogout,onProfileSaved}){
       if(!response.ok)throw Error(result.error||'Unable to send message.');
       setDistributorConversations(current=>current.map(conversation=>String(conversation.distributor?._id)===String(distributorId)?{...conversation,messages:[...(conversation.messages||[]).filter(message=>message.sentAt!==result.message.sentAt),result.message],updatedAt:result.updatedAt}:conversation));
       setToast('Message sent to distributor.');
+      return true;
+    }catch(error){setToast(error.message);return false}
+  };
+  const sendSuperagentMessage=async(superagentId,text)=>{
+    try{
+      const response=await apiFetch(`/api/admin/superagent-inbox/${encodeURIComponent(superagentId)}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const result=await responseData(response,'Superagent inbox');
+      if(!response.ok)throw Error(result.error||'Unable to send message.');
+      setSuperagentConversations(current=>current.map(conversation=>String(conversation.superagent?._id)===String(superagentId)?{...conversation,messages:[...(conversation.messages||[]).filter(message=>message.sentAt!==result.message.sentAt),result.message],updatedAt:result.updatedAt}:conversation));
+      setToast('Message sent to Superagent.');
       return true;
     }catch(error){setToast(error.message);return false}
   };
@@ -243,7 +254,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
   return <div className="app-shell">
     <aside className="sidebar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setView('overview')}}><span className="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 8.5h18M16 8.5v16M8.5 16H23"/><circle cx="16" cy="16" r="12"/></svg></span><span className="brand-copy">tap<span>&go</span><small>NETWORK OPS</small></span></a>
       <div className="workspace-switch"><span className="workspace-icon">L</span><span><b>London network</b><small>Operations workspace</small></span><span className="chevron">⌄</span></div>
-      <div className="nav-label">WORKSPACE</div><nav className="main-nav">{['overview','agents','distributors','dispatch','agentMessages','distributorInbox','superagentRequests','commuters'].map(name=><button key={name} className={`nav-item ${view===name?'active':''}`} onClick={()=>setView(name)}><Icon name={name}/>{mapNames[name]}{name==='agents'&&<span className="nav-count">{agents.length}</span>}{name==='distributors'&&<span className="nav-count">{distributors.length}</span>}{name==='dispatch'&&<span className="nav-count alert-count">{alertRows.length}</span>}{name==='agentMessages'&&agentMessages.length>0&&<span className="nav-count alert-count">{agentMessages.length>99?'99+':agentMessages.length}</span>}{name==='distributorInbox'&&distributorConversations.some(conversation=>conversation.messages?.length>0)&&<span className="nav-count">{distributorConversations.filter(conversation=>conversation.messages?.length>0).length}</span>}{name==='superagentRequests'&&superagentDeletionRequests.some(request=>request.status==='pending')&&<span className="nav-count alert-count">{superagentDeletionRequests.filter(request=>request.status==='pending').length}</span>}</button>)}</nav>
+      <div className="nav-label">WORKSPACE</div><nav className="main-nav">{['overview','agents','distributors','dispatch','agentMessages','distributorInbox','superagentMessages','superagentRequests','commuters'].map(name=><button key={name} className={`nav-item ${view===name?'active':''}`} onClick={()=>setView(name)}><Icon name={name}/>{mapNames[name]}{name==='agents'&&<span className="nav-count">{agents.length}</span>}{name==='distributors'&&<span className="nav-count">{distributors.length}</span>}{name==='dispatch'&&<span className="nav-count alert-count">{alertRows.length}</span>}{name==='agentMessages'&&agentMessages.length>0&&<span className="nav-count alert-count">{agentMessages.length>99?'99+':agentMessages.length}</span>}{name==='distributorInbox'&&distributorConversations.some(conversation=>conversation.messages?.length>0)&&<span className="nav-count">{distributorConversations.filter(conversation=>conversation.messages?.length>0).length}</span>}{name==='superagentMessages'&&superagentConversations.some(conversation=>conversation.messages?.length>0)&&<span className="nav-count">{superagentConversations.filter(conversation=>conversation.messages?.length>0).length}</span>}{name==='superagentRequests'&&superagentDeletionRequests.some(request=>request.status==='pending')&&<span className="nav-count alert-count">{superagentDeletionRequests.filter(request=>request.status==='pending').length}</span>}</button>)}</nav>
       <div className="nav-label second-label">MANAGEMENT</div><nav className="main-nav">{['liquidity','reports'].map(name=><button key={name} className={`nav-item ${view===name?'active':''}`} onClick={()=>setView(name)}><Icon name={name}/>{mapNames[name]}{name==='reports'&&settlements.some(report=>report.status==='pending')&&<span className="nav-count alert-count">{settlements.filter(report=>report.status==='pending').length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><span className="help-spark">✳</span><b>Need a hand?</b><p>Our operations team is one message away.</p><button onClick={()=>setToast('Support request started. Our operations team will be in touch.')}>Contact support <span>↗</span></button></div><button className={`nav-item settings ${view==='settings'?'active':''}`} onClick={()=>setView('settings')}><Icon name="settings"/>Settings</button><div className="profile"><div className="avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</div><span><b>{accountDisplayName(admin.name||admin.email)}</b><small>Network administrator</small></span><span className="dots">···</span></div></div>
     </aside>
@@ -257,7 +268,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
         <section className="panel alerts-panel"><div className="panel-heading"><div><h2>Priority alerts <span className="heading-count">{alertRows.length}</span></h2><p>Agents that need support now</p></div><button className="text-button" onClick={()=>setView('dispatch')}>View all <span>→</span></button></div><div className="alert-list">{alertRows.slice(0,4).map((alert,i)=>{const agent=alert.agent||{};return <article className="alert-row" key={alert._id}><span className={`alert-icon ${getRisk(agent)==='critical'?'critical':'warning'}`}>{i===0?'⌁':'⚠'}</span><div className="alert-copy"><b>{agent.name||'Network agent'}</b><span>{agent.place||agent.zone||'London'} · {money(alert.balanceAtTrigger??agent.floatBalance)} remaining</span></div><span className="alert-age">{alert.triggeredAt?new Date(alert.triggeredAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Just now'}<b className="severity critical">SOS ALERT</b></span><button className="alert-action" onClick={()=>beginDispatch(alert)}>＋ Dispatch distributor</button></article>})}</div><button className="all-alerts-button" onClick={()=>setView('dispatch')}>View dispatch queue <span>→</span></button></section></div>
       <div className="lower-grid"><section className="panel activity-panel"><div className="panel-heading"><div><h2>Network activity</h2><p>Transactions and agent top-ups over time</p></div><button className="subtle-button" onClick={()=>setToast('Activity window: last 24 hours')}>Last 24h <span>⌄</span></button></div><div className="chart-legend"><span><i className="legend-line transaction"/>Transactions</span><span><i className="legend-line topup"/>Float top-ups</span><strong>{(summary?.transactions24h||0).toLocaleString()} <small>transactions</small></strong></div><div className="chart"><div className="chart-y"><span>1,500</span><span>1,000</span><span>500</span><span>0</span></div><svg viewBox="0 0 750 165" preserveAspectRatio="none"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#2c8a69" stopOpacity=".13"/><stop offset="1" stopColor="#2c8a69" stopOpacity="0"/></linearGradient></defs><path className="grid-line" d="M0 15H750M0 58H750M0 101H750M0 144H750"/><path className="chart-area" d="M0 128C35 124 39 99 78 108S126 136 166 92 221 104 252 82 295 98 335 70 379 88 417 54 456 76 497 46 538 66 577 39 622 60 659 31 710 35 730 22 750 19V150H0Z"/><path className="chart-main" d="M0 128C35 124 39 99 78 108S126 136 166 92 221 104 252 82 295 98 335 70 379 88 417 54 456 76 497 46 538 66 577 39 622 60 659 31 710 35 730 22 750 19"/><path className="chart-secondary" d="M0 141C45 130 50 137 85 124S130 135 166 120 214 124 252 111 296 119 335 101 378 116 417 92 463 106 497 82 545 96 577 74 624 82 659 67 710 61 733 65 750 51"/></svg><div className="chart-x"><span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>Now</span></div></div></section>
         <section className="panel dispatch-panel"><div className="panel-heading"><div><h2>Active dispatches <span className="heading-count neutral">{activeDispatchRows.length}</span></h2><p>Field teams currently on the move</p></div><button className="text-button" onClick={()=>setView('dispatch')}>View all <span>→</span></button></div><div className="dispatch-list">{activeDispatchRows.length?activeDispatchRows.slice(0,3).map(dispatch=><article className="dispatch-row" key={dispatch._id}><div className="dispatch-icon">↗</div><div className="dispatch-copy"><b>{dispatch.distributor?.name||'Field distributor'} <span className="route-pill">EN ROUTE</span></b><span>Heading to {dispatch.agent?.name||'agent'} · {dispatch.agent?.place||dispatch.agent?.zone}</span></div><div className="eta"><b>Active</b><span>STATUS</span></div></article>):<div className="empty-dispatch"><span>✓</span><b>All clear for now</b><small>New dispatches will appear here.</small></div>}</div><button className="all-alerts-button dispatch-action" onClick={()=>setView('dispatch')}>Open dispatch board <span>→</span></button></section></div>
-      <footer className="page-footer"><span>Tap & Go Network Operations</span><span><i/> {loading?'Connecting…':connected?'Live connection':'Demo data'} <span className="footer-sep">·</span> Refreshes every 30s</span></footer></section>:view==='settings'?<ProfileSettings admin={admin} onSaved={onProfileSaved} onMessage={setToast}/>:<AlternateView view={view} title={title} agents={agents} distributors={distributors} alerts={alertRows} agentMessages={agentMessages} distributorConversations={distributorConversations} superagentDeletionRequests={superagentDeletionRequests} dispatches={activeDispatchRows} completedDispatches={completedDispatches} settlements={settlements} onReviewSettlement={reviewSettlement} heatmap={heatmap} analytics={analytics} connected={connected} onNewDispatch={()=>beginDispatch()} onAssignAgent={agent=>beginDispatch(null,agent)} onSelectAlert={beginDispatch} onOpenDispatch={()=>setView('dispatch')} onSendDistributorMessage={sendDistributorMessage} onRefresh={refresh} onMessage={setToast}/>}
+      <footer className="page-footer"><span>Tap & Go Network Operations</span><span><i/> {loading?'Connecting…':connected?'Live connection':'Demo data'} <span className="footer-sep">·</span> Refreshes every 30s</span></footer></section>:view==='settings'?<ProfileSettings admin={admin} onSaved={onProfileSaved} onMessage={setToast}/>:<AlternateView view={view} title={title} agents={agents} distributors={distributors} alerts={alertRows} agentMessages={agentMessages} distributorConversations={distributorConversations} superagentConversations={superagentConversations} superagentDeletionRequests={superagentDeletionRequests} dispatches={activeDispatchRows} completedDispatches={completedDispatches} settlements={settlements} onReviewSettlement={reviewSettlement} heatmap={heatmap} analytics={analytics} connected={connected} onNewDispatch={()=>beginDispatch()} onAssignAgent={agent=>beginDispatch(null,agent)} onSelectAlert={beginDispatch} onOpenDispatch={()=>setView('dispatch')} onSendDistributorMessage={sendDistributorMessage} onSendSuperagentMessage={sendSuperagentMessage} onRefresh={refresh} onMessage={setToast}/>}
       </main>
     {modal&&<div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button className="modal-close" onClick={()=>setModal(false)} aria-label="Close">×</button><div className="modal-icon">↗</div><h2 id="modalTitle">Create a dispatch</h2><p>Assign an available distributor to the selected agent.</p>
       <label htmlFor="agentSelect">Agent requiring support</label><select id="agentSelect" value={selectedAgent} onChange={event=>{const value=event.target.value;setSelectedAgent(value);const [type,id]=value.split(':',2);const record=type==='alert'?alertRows.find(alert=>String(alert._id)===id)?.agent:agents.find(agent=>String(agent._id)===id);setDispatchInstructions(dispatchInstructionFor(record))}}>{alertRows.length>0&&<optgroup label="Open support alerts">{alertRows.map(alert=><option key={alert._id} value={`alert:${alert._id}`}>{alert.agent?.name||'Agent'} · {alert.agent?.place||alert.agent?.zone||'London'} · {money(alert.balanceAtTrigger??alert.agent?.floatBalance)} float</option>)}</optgroup>}<optgroup label="Create support alert">{dispatchAgents.map(agent=><option key={agent._id} value={`agent:${agent._id}`}>{agent.name} · {agent.place||agent.zone||'Location available'} · {money(agent.floatBalance)} float</option>)}</optgroup></select>
@@ -327,6 +338,7 @@ function MobileAccounts({onMessage}){
  const [email,setEmail]=useState('');const [password,setPassword]=useState('');
  const [superagentName,setSuperagentName]=useState('');const [managedAgentIds,setManagedAgentIds]=useState([]);
  const [editingScope,setEditingScope]=useState(null);
+ const [editingSuperagent,setEditingSuperagent]=useState(null);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const refresh=async()=>{
   const response=await apiFetch('/api/admin/mobile-accounts');
@@ -361,6 +373,26 @@ function MobileAccounts({onMessage}){
    setEditingScope(null);await refresh();onMessage('Superagent agent assignments updated.');
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
+ const saveSuperagent=async()=>{
+  if(!editingSuperagent)return;
+  setError('');setBusy(true);
+  try{
+   const body={name:editingSuperagent.name,email:editingSuperagent.email};
+   if(editingSuperagent.password)body.password=editingSuperagent.password;
+   const response=await apiFetch(`/api/admin/mobile-accounts/${editingSuperagent.accountId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to update Superagent account.');
+   setEditingSuperagent(null);await refresh();onMessage('Superagent account updated; active sessions were revoked.');
+  }catch(problem){setError(problem.message)}finally{setBusy(false)}
+ };
+ const removeSuperagent=async account=>{
+  if(!window.confirm(`Permanently remove the Superagent account for ${account.profile?.name||account.email}? Agent profiles and deletion history will be retained.`))return;
+  setError('');setBusy(true);
+  try{
+   const response=await apiFetch(`/api/admin/mobile-accounts/${account.id}`,{method:'DELETE'});
+   const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to remove Superagent account.');
+   await refresh();onMessage('Superagent account removed.');
+  }catch(problem){setError(problem.message)}finally{setBusy(false)}
+ };
  const toggle=async account=>{
   try{
    const response=await apiFetch(`/api/admin/mobile-accounts/${account.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({active:!account.active})});
@@ -386,7 +418,17 @@ function MobileAccounts({onMessage}){
    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button className="primary-button" disabled={busy||(role==='superagent'?false:!available.length)}>{busy?'Creating…':'Create mobile login'}</button></div>
   </form>
-  <div className="mobile-account-list">{data.accounts.map(account=><div className="mobile-account-row" key={account.id}><span><b>{account.profile?.name||'Profile'}</b><small>{account.role} · {account.email} · {account.active?'Active':'Disabled'}{account.role==='superagent'?` · ${account.managedAgents?.length||0} assigned agent(s)`:''}</small>
+  <div className="mobile-account-list">{data.accounts.map(account=><div className="mobile-account-row" key={account.id}><div className="mobile-account-copy"><b>{account.profile?.name||'Profile'}</b><small>{account.role} · {account.email} · {account.active?'Active':'Disabled'}{account.role==='superagent'?` · ${account.managedAgents?.length||0} assigned agent(s)`:''}</small>
+   {account.role==='superagent'&&<details className="superagent-scope"><summary>Edit Superagent account</summary>
+    {editingSuperagent?.accountId===account.id?<div className="profile-form">
+     <label>Name</label><input maxLength="80" value={editingSuperagent.name} onChange={event=>setEditingSuperagent(current=>({...current,name:event.target.value}))}/>
+     <label>Sign-in email</label><input type="email" maxLength="254" value={editingSuperagent.email} onChange={event=>setEditingSuperagent(current=>({...current,email:event.target.value}))}/>
+     <label>Reset password (optional)</label><input type="password" autoComplete="new-password" minLength="12" maxLength="1024" placeholder="Leave blank to keep current password" value={editingSuperagent.password} onChange={event=>setEditingSuperagent(current=>({...current,password:event.target.value}))}/>
+     {error&&<div className="profile-form-error" role="alert">{error}</div>}
+     <button className="row-action" type="button" disabled={busy||!editingSuperagent.name.trim()||!editingSuperagent.email.trim()} onClick={saveSuperagent}>Save account</button>
+     <button className="row-action" type="button" onClick={()=>setEditingSuperagent(null)}>Cancel</button>
+    </div>:<button className="row-action" type="button" onClick={()=>setEditingSuperagent({accountId:account.id,name:account.profile?.name||'',email:account.email,password:''})}>Edit details and credentials</button>}
+   </details>}
    {account.role==='superagent'&&<details className="superagent-scope"><summary>Manage assigned agents</summary>
     {(editingScope?.accountId===account.id?availableSuperagentAgents:data.agents.filter(agent=>(account.managedAgents||[]).some(item=>String(item._id||item)===String(agent._id)))).map(agent=>{
      const currentIds=editingScope?.accountId===account.id?editingScope.ids:(account.managedAgents||[]).map(item=>String(item._id||item));
@@ -394,7 +436,7 @@ function MobileAccounts({onMessage}){
      return <label key={agent._id}><input type="checkbox" disabled={disabled} checked={currentIds.includes(String(agent._id))} onChange={event=>setEditingScope({accountId:account.id,ids:event.target.checked?[...currentIds,agent._id]:currentIds.filter(id=>id!==String(agent._id))})}/>{agent.name} · {agent.agent_id}</label>
     })}
     {editingScope?.accountId===account.id&&<button className="row-action" disabled={busy} onClick={saveScope}>Save assigned agents</button>}
-   </details>}</span><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button></div>)}</div>
+   </details>}</div><div className="mobile-account-actions"><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>)}</div>
  </section>
 }
 
@@ -587,6 +629,38 @@ function DistributorMessagesInbox({conversations,onSendMessage}){
  </section>
 }
 
+function SuperagentMessagesInbox({conversations,onSendMessage}){
+ const [drafts,setDrafts]=useState({});
+ const [sendingId,setSendingId]=useState('');
+ const send=async(event,conversation)=>{
+  event.preventDefault();
+  const text=(drafts[conversation.superagent._id]||'').trim();
+  if(!text||sendingId)return;
+  setSendingId(conversation.superagent._id);
+  if(await onSendMessage(conversation.superagent._id,text)){
+   setDrafts(current=>({...current,[conversation.superagent._id]:''}));
+  }
+  setSendingId('');
+ };
+ return <section className="panel superagent-chat-list">
+  <div className="panel-heading"><div><h2>Superagent conversations</h2><p>Private messages between network administrators and Superagents.</p></div><span className="heading-count">{conversations.length}</span></div>
+  {conversations.map(conversation=>{
+   const superagent=conversation.superagent||{};
+   return <article className="superagent-chat-card" key={superagent._id}>
+    <header><div><b>{superagent.name||'Superagent'}</b><small>{superagent.email} · {superagent.active?'Active account':'Disabled account'}</small></div></header>
+    <div className="superagent-chat-history" aria-live="polite">
+     {conversation.messages?.length?conversation.messages.slice(-12).map((message,index)=><div className={`dispatch-message ${message.sender==='admin'?'admin-message':'distributor-message'}`} key={`${message.sentAt}-${index}`}><b>{message.senderName|| (message.sender==='admin'?'Operations':'Superagent')}</b><span>{message.text}</span><small>{message.sentAt?new Date(message.sentAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</small></div>):<p className="distributor-inbox-empty">No messages yet. Send a message to start the conversation.</p>}
+    </div>
+    <form className="distributor-inbox-compose" onSubmit={event=>send(event,conversation)}>
+     <input aria-label={`Message to ${superagent.name||'Superagent'}`} value={drafts[superagent._id]||''} onChange={event=>setDrafts(current=>({...current,[superagent._id]:event.target.value}))} maxLength={500} placeholder={`Message ${superagent.name||'Superagent'}…`}/>
+     <button className="primary-button" type="submit" disabled={!(drafts[superagent._id]||'').trim()||sendingId===superagent._id}>{sendingId===superagent._id?'Sending…':'Send'}</button>
+    </form>
+   </article>;
+  })}
+  {!conversations.length&&<p className="empty-table">Create a Superagent login in administrator settings to start a conversation.</p>}
+ </section>
+}
+
 function SuperagentDeletionRequests({requests,onRefresh,onMessage}){
  const [notes,setNotes]=useState({});const [busyId,setBusyId]=useState('');
  const review=async(request,status)=>{
@@ -616,7 +690,7 @@ function SuperagentDeletionRequests({requests,onRefresh,onMessage}){
  </section>
 }
 
-function AlternateView({view,title,agents,distributors,alerts,agentMessages,distributorConversations,superagentDeletionRequests,dispatches,completedDispatches,settlements,onReviewSettlement,heatmap,analytics,connected,onNewDispatch,onAssignAgent,onSelectAlert,onOpenDispatch,onSendDistributorMessage,onRefresh,onMessage}){
+function AlternateView({view,title,agents,distributors,alerts,agentMessages,distributorConversations,superagentConversations,superagentDeletionRequests,dispatches,completedDispatches,settlements,onReviewSettlement,heatmap,analytics,connected,onNewDispatch,onAssignAgent,onSelectAlert,onOpenDispatch,onSendDistributorMessage,onSendSuperagentMessage,onRefresh,onMessage}){
  const [zoneFilter,setZoneFilter]=useState('all');const [agentSort,setAgentSort]=useState('float-low');
  const [profileEditor,setProfileEditor]=useState(null);const [includeArchived,setIncludeArchived]=useState(false);const [archivedRecords,setArchivedRecords]=useState([]);
  const [zoneAgents,setZoneAgents]=useState([]);
@@ -655,9 +729,10 @@ function AlternateView({view,title,agents,distributors,alerts,agentMessages,dist
   }catch(error){onMessage(error.message)}
  };
  const sendDispatchMessage=async(dispatch,text)=>{try{const response=await apiFetch(`/api/dispatches/${dispatch._id}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const data=await responseData(response,'Dispatch messaging');if(!response.ok)throw Error(data.error);onMessage('Message sent to distributor.');onRefresh();return true}catch(error){onMessage(error.message);return false}};
- return <section className="page-content alternate-view"><div className="page-heading"><div><div className="eyebrow"><span className="pulse"/> NETWORK OPERATIONS</div><h1>{title}</h1><p>{view==='agents'?'Create and manage agent profiles, mobile credentials, and operating locations.':view==='distributors'?'Create and manage distributor profiles, mobile credentials, and operating locations.':view==='dispatch'?'Assign distributors to open agent requests and track float replenishments.':view==='agentMessages'?'Read support messages and low-float alerts sent by agents. New messages appear here in real time.':view==='distributorInbox'?'Start and continue private conversations with distributors who have an active mobile login. Messages appear here in real time.':view==='superagentRequests'?'Review deletion requests submitted by Superagents. Agents remain active until an administrator approves a request.':view==='liquidity'?'Identify low-float clusters and network demand by operating zone.':view==='reports'?'Review bank settlements, operational events, and regional liquidity.':'Commuters use the Tap & Go mobile app to locate active nearby agents.'}</p></div>{view==='agents'||view==='distributors'?<button className="primary-button" onClick={()=>setProfileEditor({role,record:null})}><span>＋</span> Add {role}</button>:view==='agentMessages'||view==='distributorInbox'||view==='superagentRequests'?<button className="subtle-button" onClick={onRefresh}>Refresh</button>:view!=='commuters'&&<button className="primary-button" onClick={onNewDispatch}><span>＋</span> New dispatch</button>}</div>
+ return <section className="page-content alternate-view"><div className="page-heading"> <div><div className="eyebrow"><span className="pulse"/> NETWORK OPERATIONS</div><h1>{title}</h1><p>{view==='agents'?'Create and manage agent profiles, mobile credentials, and operating locations.':view==='distributors'?'Create and manage distributor profiles, mobile credentials, and operating locations.':view==='dispatch'?'Assign distributors to open agent requests and track float replenishments.':view==='agentMessages'?'Read support messages and low-float alerts sent by agents. New messages appear here in real time.':view==='distributorInbox'?'Start and continue private conversations with distributors who have an active mobile login. Messages appear here in real time.':view==='superagentMessages'?'Send and receive private messages with Superagents. Messages appear here in real time.':view==='superagentRequests'?'Review deletion requests submitted by Superagents. Agents remain active until an administrator approves a request.':view==='liquidity'?'Identify low-float clusters and network demand by operating zone.':view==='reports'?'Review bank settlements, operational events, and regional liquidity.':'Commuters use the Tap & Go mobile app to locate active nearby agents.'}</p></div>{view==='agents'||view==='distributors'?<button className="primary-button" onClick={()=>setProfileEditor({role,record:null})}><span>＋</span> Add {role}</button>:view==='agentMessages'||view==='distributorInbox'||view==='superagentMessages'||view==='superagentRequests'?<button className="subtle-button" onClick={onRefresh}>Refresh</button>:view!=='commuters'&&<button className="primary-button" onClick={onNewDispatch}><span>＋</span> New dispatch</button>}</div>
  {view==='agentMessages'&&<AgentMessagesInbox messages={agentMessages} dispatches={dispatches} onAssign={onSelectAlert} onOpenDispatch={onOpenDispatch}/>}
  {view==='distributorInbox'&&<DistributorMessagesInbox conversations={distributorConversations} onSendMessage={onSendDistributorMessage}/>}
+ {view==='superagentMessages'&&<SuperagentMessagesInbox conversations={superagentConversations} onSendMessage={onSendSuperagentMessage}/>}
  {view==='superagentRequests'&&<SuperagentDeletionRequests requests={superagentDeletionRequests} onRefresh={onRefresh} onMessage={onMessage}/>}
  {(view==='agents'||view==='distributors')&&profileEditor&&<NetworkProfileForm key={`${profileEditor.role}-${profileEditor.record?._id||'new'}`} role={profileEditor.role} record={profileEditor.record} zoneOptions={zones} onCancel={()=>setProfileEditor(null)} onSaved={async savedProfile=>{setProfileEditor(null);if(savedProfile?.zone)setZoneAgents(current=>[...current.filter(agent=>agent._id!==savedProfile._id),savedProfile]);onRefresh();if(includeArchived){try{const response=await apiFetch(`/api/${kind}?includeArchived=true`);if(!response.ok)throw Error('Profile saved, but the archived list could not be refreshed.');setArchivedRecords(await response.json())}catch(error){onMessage(error.message)}}}} onMessage={onMessage}/>}
  {(view==='agents'||view==='distributors')&&<section className="panel table-panel network-crud-panel">
