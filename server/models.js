@@ -236,6 +236,17 @@ const distributorInboxSchema = new mongoose.Schema({
   messages: { type: [distributorInboxMessageSchema], default: [] }
 }, { timestamps: true });
 
+const superagentInboxMessageSchema = new mongoose.Schema({
+  sender: { type: String, enum: ['admin', 'superagent'], required: true },
+  senderName: { type: String, required: true, trim: true, maxlength: 80 },
+  text: { type: String, required: true, trim: true, maxlength: 500 },
+  sentAt: { type: Date, default: Date.now }
+}, { _id: false });
+const superagentInboxSchema = new mongoose.Schema({
+  superagent: { type: mongoose.Schema.Types.ObjectId, ref: 'MobileAccount', required: true, unique: true },
+  messages: { type: [superagentInboxMessageSchema], default: [] }
+}, { timestamps: true });
+
 module.exports = {
   lowFloatThreshold,
   Agent: mongoose.model('Agent', agentSchema),
@@ -250,5 +261,6 @@ module.exports = {
   MobileAccount: mongoose.model('MobileAccount', mobileAccountSchema, 'mobile_accounts'),
   SuperagentDeletionRequest: mongoose.model('SuperagentDeletionRequest', superagentDeletionRequestSchema, 'superagent_deletion_requests'),
   CommuterAccount: mongoose.model('CommuterAccount', commuterAccountSchema, 'commuter_accounts'),
-  DistributorInbox: mongoose.model('DistributorInbox', distributorInboxSchema, 'distributor_inboxes')
+  DistributorInbox: mongoose.model('DistributorInbox', distributorInboxSchema, 'distributor_inboxes'),
+  SuperagentInbox: mongoose.model('SuperagentInbox', superagentInboxSchema, 'superagent_inboxes')
 };
