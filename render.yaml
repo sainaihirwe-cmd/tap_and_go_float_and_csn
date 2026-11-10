@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: tap-and-go-float-and-csn-backend
+    runtime: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://tap-and-go-float-and-csn-frontend.onrender.com
+      - key: WEB_ORIGIN
+        value: https://tap-and-go-float-and-csn-frontend.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: ADMIN_EMAIL
+        value: admin@tapandgo.local
+      - key: ADMIN_PASSWORD
+        value: TapGoDev2026!
+      - key: AUTH_SECRET
+        generateValue: true
+
+  - type: static
+    name: tap-and-go-float-and-csn-frontend
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://tap-and-go-float-and-csn-backend.onrender.com
