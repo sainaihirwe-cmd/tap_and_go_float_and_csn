@@ -103,7 +103,7 @@ const roleCopy = {
   en: {
     'guide': 'Tap below and allow location access to find active agents within {radius}. Choose an agent for directions.',
     'Create a commuter account':'Create a commuter account','Sign in to your commuter account':'Sign in to your commuter account',
-    'Create an account to open the nearby-agent map. Agent and distributor access is created by an administrator.':'Create an account to open the nearby-agent map. Agent and distributor access is created by an administrator.',
+    'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.':'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.',
     'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.':'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.',
     'Full name':'Full name','At least 12 characters':'At least 12 characters','Create account & open map':'Create account & open map',
     'Please wait…':'Please wait…','Already have an account? Sign in':'Already have an account? Sign in','New commuter? Create an account':'New commuter? Create an account',
@@ -150,7 +150,7 @@ const roleCopy = {
   rw: {
     'NETWORK SUPPORT':'UBUFASHA BW’URUSOBE','LIVE':'BIRI GUKORA','Agent':'Umukozi','Distributor':'Utanga amafaranga',
     'Create a commuter account':'Fungura konti y’umugenzi','Sign in to your commuter account':'Injira muri konti y’umugenzi',
-    'Create an account to open the nearby-agent map. Agent and distributor access is created by an administrator.':'Fungura konti kugira ngo urebe ikarita y’abakozi bakwegereye. Konti z’abakozi n’abatanga amafaranga zitangwa n’umuyobozi.',
+    'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.':'Ushobora gufungura konti yo kubika imyirondoro yawe. Ushobora gushaka abakozi bakwegereye utinjiye muri konti. Konti z’abakozi n’abatanga amafaranga zitangwa n’umuyobozi.',
     'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.':'Abakozi n’abatanga amafaranga ntibifungurira konti; umuyobozi ni we ubaha amakuru yo kwinjira.',
     'Full name':'Amazina yose','At least 12 characters':'Inyuguti nibura 12','Create account & open map':'Fungura konti urebe ikarita',
     'Please wait…':'Tegereza…','Already have an account? Sign in':'Usanzwe ufite konti? Injira','New commuter? Create an account':'Uri umugenzi mushya? Fungura konti',
@@ -245,7 +245,7 @@ const roleCopy = {
   fr: {
     'NETWORK SUPPORT':'ASSISTANCE RÉSEAU','LIVE':'EN DIRECT','Commuter':'Voyageur','Agent':'Agent','Distributor':'Distributeur',
     'Create a commuter account':'Créer un compte voyageur','Sign in to your commuter account':'Se connecter au compte voyageur',
-    'Create an account to open the nearby-agent map. Agent and distributor access is created by an administrator.':'Créez un compte pour afficher la carte des agents à proximité. Les comptes agent et distributeur sont créés par un administrateur.',
+    'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.':'Créez un compte facultatif pour enregistrer votre profil voyageur. Vous pouvez rechercher des agents à proximité sans vous connecter. Les comptes agent et distributeur sont créés par un administrateur.',
     'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.':'Les agents et distributeurs ne peuvent pas créer leur compte ; l’administrateur fournit leurs identifiants.',
     'Full name':'Nom complet','At least 12 characters':'12 caractères minimum','Create account & open map':'Créer un compte et afficher la carte',
     'Please wait…':'Veuillez patienter…','Already have an account? Sign in':'Vous avez déjà un compte ? Connectez-vous','New commuter? Create an account':'Nouveau voyageur ? Créez un compte',
@@ -1080,7 +1080,7 @@ export default function App() {
 
       {role === 'commuter' && !account && !staffLoginOpen && <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{translate(commuterLanguage, commuterAuthMode === 'register' ? 'Create a commuter account' : 'Sign in to your commuter account')}</Text>
-        <Text style={styles.help}>{translate(commuterLanguage, 'Create an account to open the nearby-agent map. Agent and distributor access is created by an administrator.')}</Text>
+        <Text style={styles.help}>{translate(commuterLanguage, 'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.')}</Text>
         {commuterAuthMode === 'register' && <Input label={translate(commuterLanguage, 'Full name')} value={commuterName} onChangeText={setCommuterName} placeholder={translate(commuterLanguage, 'Your name')} autoCapitalize="words" maxLength={80}/>}
         <Input label={translate(commuterLanguage, 'Email')} value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
         <Input label={translate(commuterLanguage, 'Password')} value={password} onChangeText={setPassword} placeholder={translate(commuterLanguage, 'At least 12 characters')} secureTextEntry maxLength={1024}/>
@@ -1108,7 +1108,8 @@ export default function App() {
         </TouchableOpacity>
       </View>}
 
-      {role === 'commuter' && account?.role === 'commuter' && <>
+      {role === 'commuter' && <>
+        {account?.role === 'commuter' && <>
         <View style={styles.accountBar}>
           <View style={styles.flex}><Text style={styles.cardTitle}>{profile?.name}</Text><Text style={styles.cardSub}>{account.email}</Text></View>
           <View style={styles.accountActions}>
@@ -1120,7 +1121,9 @@ export default function App() {
             </TouchableOpacity>
           </View>
         </View>
-        {profileOpen ? <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/> : <>
+        {profileOpen && <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
+        </>}
+        {(!account || account.role === 'commuter') && !profileOpen && <>
         <View style={styles.mapCard}>
           <MapView provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined} style={styles.map}
             initialRegion={london}
