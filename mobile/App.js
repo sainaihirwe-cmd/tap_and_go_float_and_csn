@@ -108,6 +108,7 @@ const roleCopy = {
     'Full name':'Full name','At least 12 characters':'At least 12 characters','Create account & open map':'Create account & open map',
     'Please wait…':'Please wait…','Already have an account? Sign in':'Already have an account? Sign in','New commuter? Create an account':'New commuter? Create an account',
     'Agent, Distributor or Superagent sign in':'Agent, Distributor or Superagent sign in','Back to commuter account':'Back to commuter account',
+    'Create or sign in to a commuter account':'Create or sign in to a commuter account','Back to nearby agents':'Back to nearby agents',
     'Home':'Home','Messages':'Messages','Settings':'Settings','Close settings':'Close settings','Messages & support':'Messages & support',
     'Superagent network':'Superagent network','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Manage only the agents assigned to you. POS accounts remain administrator-managed.',
     'Your assigned agents':'Your assigned agents','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.',
@@ -163,6 +164,7 @@ const roleCopy = {
     'Sign in to your Agent account':'Injira muri konti yawe y’umukozi','Sign in to your Distributor account':'Injira muri konti yawe y’utanga amafaranga','Accounts are created by your network administrator. Contact them if you need access.':'Konti itangwa n’umuyobozi w’urusobe. Muvugishe niba ukeneye ubufasha.',
     'Email':'Imeyili','Password':'Ijambo ry’ibanga','Your password':'Ijambo ry’ibanga ryawe','Sign in':'Injira','Signing in…':'Urimo kwinjira…',
     'Agent, Distributor or Superagent sign in':'Kwinjira kw’umukozi, utanga amafaranga cyangwa superagent','Back to commuter account':'Subira kuri konti y’umugenzi',
+    'Create or sign in to a commuter account':'Fungura konti y’umugenzi cyangwa winjire','Back to nearby agents':'Subira ku bakozi bakwegereye',
     'Home':'Ahabanza','Messages':'Ubutumwa','Settings':'Igenamiterere','Close settings':'Funga igenamiterere','Messages & support':'Ubutumwa n’ubufasha',
     'Superagent network':'Urusobe rwa superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Ushobora gucunga abakozi bahawe konti yawe gusa. Umuyobozi ni we ucunga konti za POS.',
     'Your assigned agents':'Abakozi wagenewe','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'Ushobora gucunga abakozi wagenewe gusa. Amafaranga yabo ya POS agaragara hano. Umuyobozi ni we ufungura konti zabo.',
@@ -258,6 +260,7 @@ const roleCopy = {
     'Sign in to your Agent account':'Connectez-vous à votre compte agent','Sign in to your Distributor account':'Connectez-vous à votre compte distributeur','Accounts are created by your network administrator. Contact them if you need access.':'Votre compte est créé par l’administrateur du réseau. Contactez-le pour obtenir de l’aide.',
     'Email':'E-mail','Password':'Mot de passe','Your password':'Votre mot de passe','Sign in':'Se connecter','Signing in…':'Connexion…',
     'Agent, Distributor or Superagent sign in':'Connexion agent, distributeur ou Superagent','Back to commuter account':'Retour au compte voyageur',
+    'Create or sign in to a commuter account':'Créer un compte voyageur ou se connecter','Back to nearby agents':'Retour aux agents à proximité',
     'Home':'Accueil','Messages':'Messages','Settings':'Paramètres','Close settings':'Fermer les paramètres','Messages & support':'Messages et assistance',
     'Superagent network':'Réseau Superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Gérez uniquement les agents qui vous sont attribués. Les comptes POS restent gérés par l’administrateur.',
     'Your assigned agents':'Vos agents attribués','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'Vous gérez uniquement les agents attribués à votre compte. Leur solde POS apparaît ici. Seul un administrateur peut créer leurs accès.',
@@ -442,6 +445,7 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [commuterName, setCommuterName] = useState('');
+  const [commuterAuthOpen, setCommuterAuthOpen] = useState(false);
   const [commuterAuthMode, setCommuterAuthMode] = useState('register');
   const [staffLoginOpen, setStaffLoginOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
@@ -515,6 +519,7 @@ export default function App() {
       if (!active) return;
       setAccount(null);
       setRole('commuter');
+      setCommuterAuthOpen(true);
       setStaffLoginOpen(true);
       setProfileOpen(false);
       setTasks([]);
@@ -715,6 +720,7 @@ export default function App() {
       const value = { ...result.account, entity: result.entity };
       setAccount(value);
       setRole(value.role);
+      setCommuterAuthOpen(false);
       if (value.entity.floatBalance !== undefined) setFloatBalance(String(value.entity.floatBalance));
       setPassword('');
       setLoginError('');
@@ -743,6 +749,8 @@ export default function App() {
       const value = { ...result.account, entity: result.entity };
       setAccount(value);
       setRole('commuter');
+      setCommuterAuthOpen(false);
+      setStaffLoginOpen(false);
       setPassword('');
       setLoginError('');
       flash(translate(commuterLanguage, register ? 'Commuter account created. Welcome, {name}.' : 'Signed in: {name}.').replace('{name}', value.entity.name));
@@ -781,6 +789,7 @@ export default function App() {
       commuterMapLoaded.current = '';
       setRole('commuter');
       setProfileOpen(false);
+      setCommuterAuthOpen(false);
       setStaffTab('home');
       setStaffLoginOpen(false);
       setCommuterAuthMode('register');
@@ -1072,13 +1081,13 @@ export default function App() {
           translate(commuterLanguage, role === 'agent' ? 'Keep your balance and support team in sync.' :
             role === 'distributor' ? 'Replenishment tasks assigned to your account.' : 'Manage only the agents assigned to you. POS accounts remain administrator-managed.')}
       </Text>
-      {role === 'commuter' && <View style={[styles.panel, styles.supportPanel]}>
+      {role === 'commuter' && !commuterAuthOpen && !staffLoginOpen && !profileOpen && (!account || account.role === 'commuter') && <View style={[styles.panel, styles.supportPanel]}>
         <Text style={styles.cardTitle}>{commuter.supportTitle}</Text>
         <Text style={styles.cardSub}>{commuter.supportDescription}</Text>
         <ActionButton secondary onPress={callSupport}>{commuter.supportCall}</ActionButton>
       </View>}
 
-      {role === 'commuter' && !account && !staffLoginOpen && <View style={styles.panel}>
+      {role === 'commuter' && commuterAuthOpen && !account && !staffLoginOpen && <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{translate(commuterLanguage, commuterAuthMode === 'register' ? 'Create a commuter account' : 'Sign in to your commuter account')}</Text>
         <Text style={styles.help}>{translate(commuterLanguage, 'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.')}</Text>
         {commuterAuthMode === 'register' && <Input label={translate(commuterLanguage, 'Full name')} value={commuterName} onChangeText={setCommuterName} placeholder={translate(commuterLanguage, 'Your name')} autoCapitalize="words" maxLength={80}/>}
@@ -1094,9 +1103,12 @@ export default function App() {
         <TouchableOpacity accessibilityRole="button" onPress={() => { setStaffLoginOpen(true); setLoginError(''); }} style={styles.authSwitch}>
           <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Agent, Distributor or Superagent sign in')}</Text>
         </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => { setCommuterAuthOpen(false); setLoginError(''); }} style={styles.authSwitch}>
+          <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Back to nearby agents')}</Text>
+        </TouchableOpacity>
       </View>}
 
-      {role === 'commuter' && !account && staffLoginOpen && <View style={styles.panel}>
+      {role === 'commuter' && commuterAuthOpen && !account && staffLoginOpen && <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{translate(commuterLanguage, 'Agent, Distributor or Superagent sign in')}</Text>
         <Text style={styles.help}>{translate(commuterLanguage, 'Accounts are created by your network administrator. Contact them if you need access.')}</Text>
         <Input label={translate(commuterLanguage, 'Email')} value={email} onChangeText={setEmail} placeholder="you@company.com" keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
@@ -1106,9 +1118,21 @@ export default function App() {
         <TouchableOpacity accessibilityRole="button" onPress={() => { setStaffLoginOpen(false); setLoginError(''); }} style={styles.authSwitch}>
           <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Back to commuter account')}</Text>
         </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => { setCommuterAuthOpen(false); setStaffLoginOpen(false); setLoginError(''); }} style={styles.authSwitch}>
+          <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Back to nearby agents')}</Text>
+        </TouchableOpacity>
       </View>}
 
       {role === 'commuter' && <>
+        {!account && !commuterAuthOpen && <View style={styles.panel}>
+          <Text style={styles.cardTitle}>{translate(commuterLanguage, 'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.')}</Text>
+          <ActionButton secondary onPress={() => { setCommuterAuthOpen(true); setStaffLoginOpen(false); }}>
+            {translate(commuterLanguage, 'Create or sign in to a commuter account')}
+          </ActionButton>
+          <TouchableOpacity accessibilityRole="button" onPress={() => { setCommuterAuthOpen(true); setStaffLoginOpen(true); setLoginError(''); }} style={styles.authSwitch}>
+            <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Agent, Distributor or Superagent sign in')}</Text>
+          </TouchableOpacity>
+        </View>}
         {account?.role === 'commuter' && <>
         <View style={styles.accountBar}>
           <View style={styles.flex}><Text style={styles.cardTitle}>{profile?.name}</Text><Text style={styles.cardSub}>{account.email}</Text></View>
@@ -1123,7 +1147,7 @@ export default function App() {
         </View>
         {profileOpen && <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
         </>}
-        {(!account || account.role === 'commuter') && !profileOpen && <>
+        {(!account || account.role === 'commuter') && !profileOpen && !commuterAuthOpen && <>
         <View style={styles.mapCard}>
           <MapView provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined} style={styles.map}
             initialRegion={london}
