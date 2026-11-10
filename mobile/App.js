@@ -15,9 +15,9 @@ import { io } from 'socket.io-client';
 const expoHost = Constants.expoConfig?.hostUri?.split(':')[0] ||
   Constants.manifest?.debuggerHost?.split(':')[0];
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiBaseUrl || '';
-const API = configuredApiUrl.replace(/\/$/, '') ||
-  (expoHost ? `http://${expoHost}:3000` :
-    Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000');
+const developmentApiUrl = expoHost ? `http://${expoHost}:3000` :
+  Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+const API = (configuredApiUrl || (__DEV__ ? developmentApiUrl : 'https://tap-and-go-float-and-csn-backend.onrender.com')).replace(/\/$/, '');
 const TRACKING_TASK = 'tap-and-go-location';
 const LOCATION_PERMISSION_DENIED = 'TAPGO_LOCATION_PERMISSION_DENIED';
 const london = { latitude: 51.5074, longitude: -0.1278, latitudeDelta: 0.085, longitudeDelta: 0.085 };
@@ -356,7 +356,7 @@ async function api(path, options = {}) {
     });
   } catch (problem) {
     if (problem.name === 'AbortError') throw new Error('Sign-in timed out. Check the server connection and try again.');
-    throw new Error(`Cannot reach the Tap & Go server at ${API}. Connect your phone and computer to the same Wi-Fi, or set EXPO_PUBLIC_API_URL to the computer's LAN address. ${problem.message}`);
+    throw new Error(`Cannot reach the Tap & Go server at ${API}. Check your internet connection. For local development, set EXPO_PUBLIC_API_URL to your computer's LAN address. ${problem.message}`);
   } finally {
     if (timeout) clearTimeout(timeout);
   }
