@@ -26,6 +26,8 @@ const commuterCopy = {
   en: {
     role: 'Commuter', title: 'Find an agent', subtitle: 'Nearby ticket top-ups, without the guesswork.',
     header: 'NETWORK SUPPORT', live: 'LIVE', footer: 'Tap & Go · London network', agentFallback: 'Tap & Go agent',
+    supportTitle: 'Need help?', supportDescription: 'Call our operations support line.', supportCall: 'Call support · 6655',
+    supportError: 'Unable to open your phone app. Please call 6655 directly.',
     guide: null,
     find: '◎  Find active agents near me', searching: 'Finding nearby agents…',
     nearby: 'Nearby agents', findTopUps: 'Find ticket top-ups nearby',
@@ -49,6 +51,8 @@ const commuterCopy = {
   rw: {
     role: 'Umugenzi', title: 'Shaka umukozi', subtitle: 'Shaka aho wakwongera amafaranga yo kugura amatike hafi yawe.',
     header: 'UBUFASHA BW’URUSOBE', live: 'BIRI GUKORA', footer: 'Tap & Go · Urusobe rw’i Londres', agentFallback: 'Umukozi wa Tap & Go',
+    supportTitle: 'Ukeneye ubufasha?', supportDescription: 'Hamagara ishami ridufasha.', supportCall: 'Hamagara ubufasha · 6655',
+    supportError: 'Ntitwabashije gufungura telefone. Hamagara 6655.',
     guide: null,
     find: '◎  Shaka abakozi bakora hafi yanjye', searching: 'Turimo gushaka abakozi hafi yawe…',
     nearby: 'Abakozi bakwegereye', findTopUps: 'Shaka aho wakwongera amafaranga yo kugura amatike',
@@ -72,6 +76,8 @@ const commuterCopy = {
   fr: {
     role: 'Voyageur', title: 'Trouver un agent', subtitle: 'Trouvez facilement un point de recharge de titres de transport à proximité.',
     header: 'ASSISTANCE RÉSEAU', live: 'EN DIRECT', footer: 'Tap & Go · Réseau de Londres', agentFallback: 'Agent Tap & Go',
+    supportTitle: 'Besoin d’aide ?', supportDescription: 'Appelez notre service d’assistance.', supportCall: 'Appeler l’assistance · 6655',
+    supportError: 'Impossible d’ouvrir l’application téléphone. Appelez directement le 6655.',
     guide: null,
     find: '◎  Trouver des agents actifs près de moi', searching: 'Recherche des agents à proximité…',
     nearby: 'Agents à proximité', findTopUps: 'Trouver un point de recharge à proximité',
@@ -491,6 +497,14 @@ export default function App() {
   const flash = text => {
     setMessage(text);
     setTimeout(() => setMessage(''), 4200);
+  };
+  const callSupport = async () => {
+    try {
+      await Linking.openURL('tel:6655');
+    } catch (problem) {
+      console.warn('Unable to open the phone app for support:', problem.message);
+      flash(commuter.supportError);
+    }
   };
   const profile = account?.entity;
   const profileId = profile?._id;
@@ -1058,6 +1072,11 @@ export default function App() {
           translate(commuterLanguage, role === 'agent' ? 'Keep your balance and support team in sync.' :
             role === 'distributor' ? 'Replenishment tasks assigned to your account.' : 'Manage only the agents assigned to you. POS accounts remain administrator-managed.')}
       </Text>
+      {role === 'commuter' && <View style={[styles.panel, styles.supportPanel]}>
+        <Text style={styles.cardTitle}>{commuter.supportTitle}</Text>
+        <Text style={styles.cardSub}>{commuter.supportDescription}</Text>
+        <ActionButton secondary onPress={callSupport}>{commuter.supportCall}</ActionButton>
+      </View>}
 
       {role === 'commuter' && !account && !staffLoginOpen && <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{translate(commuterLanguage, commuterAuthMode === 'register' ? 'Create a commuter account' : 'Sign in to your commuter account')}</Text>
