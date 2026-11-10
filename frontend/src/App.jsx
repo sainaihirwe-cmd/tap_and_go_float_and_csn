@@ -592,7 +592,7 @@ function CommuterMap(){
 }
 
 function SettlementReports({reports,onReview}) {
- return <section className="panel table-panel">
+ return <section className="panel table-panel settlement-report-panel">
   <div className="panel-heading"><div><h2>Agent bank-slip settlements</h2><p>Verify the bank slip before approving replacement float. Reported use is calculated from recorded ticket sales.</p></div></div>
   <div className="table-scroll"><table><thead><tr><th>SUBMITTED</th><th>AGENT</th><th>RECORDED USE</th><th>BANK DEPOSIT</th><th>BANK REFERENCE</th><th>STATUS</th><th>PROOF / REVIEW</th></tr></thead><tbody>
    {reports.map(report=><tr key={report._id}>
@@ -622,7 +622,7 @@ function AgentMessagesInbox({messages,dispatches,onAssign,onOpenDispatch}){
     </div>
     <p>{alert.message}</p>
     <div className="agent-inbox-footer"><span>Float at alert: <b>{money(alert.balanceAtTrigger??agent.floatBalance)}</b>{assigned?.distributor?.name?`  -  Assigned to ${assigned.distributor.name}`:''}</span>
-     {alert.state==='open'?<button className="row-action" onClick={()=>onAssign(alert)}>Choose &amp; assign distributor</button>:assigned?<button className="row-action" onClick={onOpenDispatch}>View dispatch</button>:null}
+    {alert.state==='open'?<button className="inbox-assign-button" type="button" onClick={()=>onAssign(alert)}>Choose &amp; assign distributor</button>:assigned?<button className="inbox-view-button" type="button" onClick={onOpenDispatch}>View dispatch</button>:null}
     </div>
    </article>;
   }):<p className="empty-table">Agent support messages and low-float alerts will appear here. New messages arrive in real time.</p>}
