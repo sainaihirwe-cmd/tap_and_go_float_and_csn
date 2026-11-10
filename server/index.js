@@ -254,9 +254,11 @@ function passwordMatchesConfig(password) {
   );
 }
 function setAdminCookie(res, profile) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? '; Secure' : '';
+  const sameSite = isProduction ? 'None' : 'Strict';
   const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
-  res.setHeader('Set-Cookie', `tapgo_admin_session=${encodeURIComponent(issueAdminSession(profile.email, profile.sessionVersion, expiresAt))}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`);
+  res.setHeader('Set-Cookie', `tapgo_admin_session=${encodeURIComponent(issueAdminSession(profile.email, profile.sessionVersion, expiresAt))}; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=28800${secure}`);
   return expiresAt;
 }
 function apiError(res, error) {
@@ -497,7 +499,10 @@ app.patch('/api/auth/mobile/profile', async (req, res, next) => {
 });
 app.post('/api/auth/logout', (_req, res) => {
   io.in('admin').disconnectSockets(true);
-  res.setHeader('Set-Cookie', 'tapgo_admin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const sameSite = isProduction ? 'None' : 'Strict';
+  const secure = isProduction ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `tapgo_admin_session=; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=0${secure}`);
   res.json({ ok: true });
 });
 app.get('/api/auth/me', requireAdmin, (req, res) => res.json({ email: req.admin.sub, name: req.admin.name || '', expiresAt: req.admin.exp }));
