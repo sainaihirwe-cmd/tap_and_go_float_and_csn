@@ -9,6 +9,16 @@ const demoDistributors=[{_id:'d1',name:'Daniel Carter',location:{coordinates:[-0
 const mapNames={overview:'Overview',agents:'Agent network',distributors:'Distributors',dispatch:'Dispatch',agentMessages:'Agent inbox',distributorInbox:'Distributor inbox',superagentMessages:'Superagent chat',superagentRequests:'Superagent deletion requests',commuters:'Commuter map',liquidity:'Liquidity insights',reports:'Reports',settings:'Settings'};
 const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const apiUrl = path => apiBaseUrl ? `${apiBaseUrl}${path}` : path;
+const adminSessionKey='tapgo_admin_session';
+function readAdminSession(){
+  try{
+    const session=JSON.parse(sessionStorage.getItem(adminSessionKey)||'null');
+    if(!session?.token||Number(session.expiresAt)<=Date.now()){sessionStorage.removeItem(adminSessionKey);return null}
+    return session;
+  }catch{return null}
+}
+function saveAdminSession(session){sessionStorage.setItem(adminSessionKey,JSON.stringify(session))}
+function clearAdminSession(){sessionStorage.removeItem(adminSessionKey)}
 const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(value||0);
 const formatShiftDuration=seconds=>{
   const minutes=Math.floor((Number(seconds)||0)/60);
@@ -26,8 +36,11 @@ async function apiFetch(input,options={}){
   const resolvedInput = typeof input === 'string' && input.startsWith('/')
     ? apiUrl(input)
     : input;
-  const response=await fetch(resolvedInput,{...options,credentials:'include'});
-  if(response.status===401){window.dispatchEvent(new Event('tapgo:session-expired'));throw Error('Your session expired. Please sign in again.')}
+  const headers=new Headers(options.headers||{});
+  const session=readAdminSession();
+  if(session?.token)headers.set('Authorization',`Bearer ${session.token}`);
+  const response=await fetch(resolvedInput,{...options,headers,credentials:'omit'});
+  if(response.status===401){clearAdminSession();window.dispatchEvent(new Event('tapgo:session-expired'));throw Error('Your session expired. Please sign in again.')}
   return response;
 }
 async function responseData(response,service){
@@ -139,6 +152,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
   useEffect(()=>{
     const socket = io(apiBaseUrl || window.location.origin, {
       autoConnect: false,
+      auth: { token: admin.token },
       withCredentials: true,
       transports: ['websocket', 'polling']
     });
@@ -164,7 +178,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
     socket.on('superagent:deletion-request-updated',request=>{setSuperagentDeletionRequests(current=>[request,...current.filter(item=>item._id!==request._id)]);setToast(`${request.agent?.name||'Agent'} deletion request ${request.status}.`)});
     socket.connect();
     return()=>socket.disconnect();
-  },[refresh]);
+  },[refresh,admin.token]);
   useEffect(()=>{if(!toast)return;const timeout=setTimeout(()=>setToast(''),3300);return()=>clearTimeout(timeout)},[toast]);
   const activeAgents=summary?.agents?.active??agents.filter(a=>a.status==='active').length;const atRisk=summary?.agents?.atRisk??agents.filter(a=>getRisk(a)!=='healthy').length;const liquidity=summary?.agents?.liquidity??agents.reduce((sum,a)=>sum+(a.floatBalance||0),0);const shownAgents=useMemo(()=>agents.filter(a=>mapFilter==='all'||(mapFilter==='risk'&&getRisk(a)!=='healthy')), [agents,mapFilter]);
   const greeting=`Good ${clock.getHours()<12?'morning':clock.getHours()<17?'afternoon':'evening'}, ${accountDisplayName(admin.name||admin.email)}`;
@@ -294,17 +308,19 @@ function App(){
  const [session,setSession]=useState(undefined);const [sessionNotice,setSessionNotice]=useState('');
  useEffect(()=>{
   let mounted=true;
+  const storedSession=readAdminSession();
+  if(!storedSession?.token){setSession(null);return()=>{mounted=false}}
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),8000);
-  const expired=()=>{setSessionNotice('Your session expired. Please sign in again.');setSession(null)};
+  const expired=()=>{clearAdminSession();setSessionNotice('Your session expired. Please sign in again.');setSession(null)};
   window.addEventListener('tapgo:session-expired',expired);
-  fetch(apiUrl('/api/auth/me'),{credentials:'include',signal:controller.signal})
+  fetch(apiUrl('/api/auth/me'),{headers:{Authorization:`Bearer ${storedSession.token}`},credentials:'omit',signal:controller.signal})
    .then(response=>{
-    if(response.status===401)return null;
+    if(response.status===401){clearAdminSession();setSessionNotice('Your session expired. Please sign in again.');return null}
     if(!response.ok)throw new Error(`Session check failed (HTTP ${response.status}).`);
     return response.json();
    })
-   .then(value=>{if(mounted)setSession(value)})
+   .then(value=>{if(mounted)setSession(value?{...storedSession,...value}:null)})
    .catch(error=>{
     if(!mounted)return;
     setSessionNotice(error.name==='AbortError'
@@ -315,15 +331,16 @@ function App(){
    .finally(()=>clearTimeout(timeout));
   return()=>{mounted=false;clearTimeout(timeout);controller.abort();window.removeEventListener('tapgo:session-expired',expired)};
  },[]);
- const logout=useCallback(async(expired=false)=>{setSessionNotice(expired?'Your session expired. Please sign in again.':'');setSession(null);await fetch(apiUrl('/api/auth/logout'),{method:'POST',credentials:'include'}).catch(()=>{})},[]);
- const login=sessionData=>{setSessionNotice('');setSession(sessionData)};
+ const logout=useCallback(async(expired=false)=>{clearAdminSession();setSessionNotice(expired?'Your session expired. Please sign in again.':'');setSession(null);await fetch(apiUrl('/api/auth/logout'),{method:'POST',credentials:'include'}).catch(()=>{})},[]);
+ const login=sessionData=>{saveAdminSession(sessionData);setSessionNotice('');setSession(sessionData)};
+ const updateSession=sessionData=>{const current=readAdminSession();const updated={...current,...sessionData,token:sessionData.token||current?.token};saveAdminSession(updated);setSession(updated)};
  if(session===undefined)return <main className="login-screen"><div className="login-loading">Tap &amp; Go <span>Checking secure sessionâ€¦</span></div></main>;
- return session?<Dashboard admin={session} onLogout={logout} onProfileSaved={setSession}/>:<LoginScreen onLogin={login} notice={sessionNotice}/>;
+ return session?<Dashboard admin={session} onLogout={logout} onProfileSaved={updateSession}/>:<LoginScreen onLogin={login} notice={sessionNotice}/>;
 }
 
 function LoginScreen({onLogin,notice}){
  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const submit=async event=>{event.preventDefault();setError('');setBusy(true);try{const response=await fetch(apiUrl('/api/auth/login'),{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const data=await responseData(response,'Login service');if(!response.ok)throw Error(data.error||`Unable to sign in (HTTP ${response.status}).`);if(!data.expiresAt)throw Error('Login service did not return a session expiry. Please try again.');onLogin(data)}catch(problem){setError(problem instanceof TypeError?'Cannot reach the login service. Check the backend connection and try again.':problem.message)}finally{setBusy(false)}};
+ const submit=async event=>{event.preventDefault();setError('');setBusy(true);try{const response=await fetch(apiUrl('/api/auth/login'),{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const data=await responseData(response,'Login service');if(!response.ok)throw Error(data.error||`Unable to sign in (HTTP ${response.status}).`);if(!data.expiresAt||!data.token)throw Error('Login service did not return a secure session. Please try again.');onLogin(data)}catch(problem){setError(problem instanceof TypeError?'Cannot reach the login service. Check the backend connection and try again.':problem.message)}finally{setBusy(false)}};
  return <main className="login-screen"><section className="login-card"><a className="brand login-brand" href="#"><span className="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 8.5h18M16 8.5v16M8.5 16H23"/><circle cx="16" cy="16" r="12"/></svg></span><span className="brand-copy">tap<span>&go</span><small>NETWORK OPS</small></span></a><div className="login-eyebrow"><span className="pulse"/> SECURE OPERATIONS PORTAL</div><h1>Welcome back</h1><p>Sign in to monitor your network and coordinate field support.</p>{notice&&<div className="login-error" role="status">{notice}</div>}<form onSubmit={submit}><label htmlFor="admin-email">Work email</label><input id="admin-email" type="email" autoComplete="username" required value={email} onChange={event=>setEmail(event.target.value)} placeholder="you@company.com"/><label htmlFor="admin-password">Password</label><input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={event=>setPassword(event.target.value)} placeholder="Enter your password"/>{error&&<div className="login-error" role="alert">{error}</div>}<button className="primary-button login-submit" disabled={busy}>{busy?'Signing inâ€¦':'Sign in securely'} <span>â†’</span></button></form><div className="login-foot"><span>Protected network access</span><span>Sessions expire after 8 hours</span></div></section><div className="login-background-mark">T&amp;G</div></main>;
 }
 

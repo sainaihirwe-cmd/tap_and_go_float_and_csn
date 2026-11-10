@@ -154,10 +154,8 @@ function mobileEntityQuery(req, id, publicField) {
   const reference = req.mobile.account.role === 'agent' ? req.mobile.account.agent : req.mobile.account.distributor;
   return { $and: [publicIdQuery(id, publicField), { _id: reference }] };
 }
-function sessionFromRequest(req) {
-  const match = (req.headers.cookie || '').match(/(?:^|;\s*)tapgo_admin_session=([^;]+)/);
-  if (!match) return null;
-  const [payload, signature] = decodeURIComponent(match[1]).split('.');
+function sessionFromToken(token) {
+  const [payload, signature] = String(token || '').split('.');
   if (!payload || !signature) return null;
   const expected = crypto.createHmac('sha256', authSecret).update(payload).digest();
   let provided;
@@ -167,6 +165,13 @@ function sessionFromRequest(req) {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
     return data.exp > Date.now() && typeof data.sub === 'string' ? data : null;
   } catch { return null; }
+}
+function sessionFromRequest(req) {
+  const bearer = (req.headers.authorization || '').match(/^Bearer\s+(\S+)$/);
+  if (bearer) return sessionFromToken(bearer[1]);
+  const match = (req.headers.cookie || '').match(/(?:^|;\s*)tapgo_admin_session=([^;]+)/);
+  if (!match) return null;
+  try { return sessionFromToken(decodeURIComponent(match[1])); } catch { return null; }
 }
 function requireAdmin(req, res, next) {
   const session = sessionFromRequest(req);
@@ -285,7 +290,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     if (!profile || profile.email !== email || !passwordMatchesHash(password, profile.passwordHash)) return res.status(401).json({ error: 'Email or password is incorrect.' });
     const expiresAt = setAdminCookie(res, profile);
-    res.json({ email: profile.email, name: profile.name, expiresAt, expiresIn: 28800 });
+    res.json({ email: profile.email, name: profile.name, expiresAt, expiresIn: 28800, token: issueAdminSession(profile.email, profile.sessionVersion, expiresAt) });
   } catch (error) { apiError(res, error); }
 });
 app.post('/api/auth/mobile/login', async (req, res) => {
@@ -523,7 +528,7 @@ app.patch('/api/auth/profile', requireAdmin, async (req, res) => {
     await profile.save();
     io.in('admin').disconnectSockets(true);
     const expiresAt = setAdminCookie(res, profile);
-    res.json({ email: profile.email, name: profile.name, expiresAt });
+    res.json({ email: profile.email, name: profile.name, expiresAt, token: issueAdminSession(profile.email, profile.sessionVersion, expiresAt) });
   } catch (error) { apiError(res, error); }
 });
 app.get('/api/admin/mobile-accounts', requireAdmin, async (_req, res) => {
@@ -2166,7 +2171,7 @@ app.get('*', (req, res, next) => {
 
 io.use(async (socket, next) => {
   try {
-    const adminSession = sessionFromRequest(socket.request);
+    const adminSession = sessionFromToken(socket.handshake.auth?.token) || sessionFromRequest(socket.request);
     if (adminSession) {
       const profile = await AdminProfile.findOne({ key: 'primary' }).select('email sessionVersion');
       if (profile && profile.email === adminSession.sub && profile.sessionVersion === (adminSession.sessionVersion ?? 0)) {
