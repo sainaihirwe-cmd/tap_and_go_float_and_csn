@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { io } from 'socket.io-client';
+import { Activity, BarChart3, Bell, ClipboardList, FileText, LayoutDashboard, MapPin, MessageSquare, MessagesSquare, RefreshCw, Search, Send, Settings, Truck, Users } from 'lucide-react';
 import { OverviewPage, AgentsPage, DispatchPage, MessagesPage, ReportsPage, SettingsPage } from './dashboard/index.js';
 
 const demoAgents = [
@@ -53,7 +54,8 @@ async function responseData(response,service){
   }
 }
 
-function Icon({name}){const paths={overview:'',agents:'',distributors:'',dispatch:'',agentMessages:'',distributorInbox:'',superagentMessages:'',superagentRequests:'',commuters:'',liquidity:'',reports:'',settings:''};return <span className="nav-icon" aria-hidden="true">{paths[name]||''}</span>}
+const navigationIcons={overview:LayoutDashboard,agents:Users,distributors:Truck,dispatch:Send,agentMessages:MessageSquare,distributorInbox:MessagesSquare,superagentMessages:MessagesSquare,superagentRequests:ClipboardList,commuters:MapPin,liquidity:BarChart3,reports:FileText,settings:Settings};
+function Icon({name}){const Component=navigationIcons[name]||LayoutDashboard;return <Component className="nav-icon" size={16} strokeWidth={1.8} aria-hidden="true"/>}
 function MapArtwork({agents,distributors,onSelect}){
   const project=([lon,lat])=>({x:((lon+0.29)/0.27)*780,y:((51.57-lat)/0.19)*385});
   const streets=['M-10 66L793 304','M20 365L732 10','M45-10L520 395','M256-10L117 390','M591-10L388 390','M780 112L-10 207','M676 395L99-10','M0 130L787 226','M337-10L742 385','M-10 333L791 67'];
@@ -283,7 +285,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
       <div className="nav-label second-label">MANAGEMENT</div><nav className="main-nav">{['liquidity','reports'].map(name=><button key={name} className={`nav-item ${view===name?'active':''}`} onClick={()=>setView(name)}><Icon name={name}/>{mapNames[name]}{name==='reports'&&settlements.some(report=>report.status==='pending')&&<span className="nav-count alert-count">{settlements.filter(report=>report.status==='pending').length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><span className="help-spark"></span><b>Need a hand?</b><p>Our operations team is one message away.</p><button onClick={()=>setToast('Support request started. Our operations team will be in touch.')}>Contact support <span></span></button></div><button className="nav-item" onClick={()=>{setMobileAccountRole('superagent');setView('settings')}}><span className="nav-icon" aria-hidden="true"></span>Add Superagent</button><button className={`nav-item settings ${view==='settings'?'active':''}`} onClick={()=>setView('settings')}><Icon name="settings"/>Settings</button><div className="profile"><div className="avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</div><span><b>{accountDisplayName(admin.name||admin.email)}</b><small>Network administrator</small></span><span className="dots"> -  -  - </span></div></div>
     </aside>
-    <main className="main-content"><header className="topbar"><div className="breadcrumb">Network operations <span>/</span> <b>{title}</b></div><div className="top-actions"><div className="live-pill"><i className={connected?'':'offline-dot'}/>{connected?'Systems operational':'Demo data'}</div><div className={`session-timer ${sessionRemaining<=300?'expiring':''}`} role="timer" aria-label={`Automatic logout in ${sessionTime}`}><span>SESSION</span><b>{sessionTime}</b></div><button className="icon-button" aria-label="Search" onClick={()=>setToast('Search agents, zones, and dispatches')}></button><button className="icon-button notification-button" aria-label="Notifications" onClick={()=>setToast(`${alertRows.length} priority alerts need attention.`)}><i/></button><span className="top-avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</span><button className="logout-button" onClick={onLogout}>Log out</button></div></header>
+    <main className="main-content"><header className="topbar"><div className="breadcrumb">Network operations <span>/</span> <b>{title}</b></div><div className="top-actions"><div className="live-pill"><i className={connected?'':'offline-dot'}/>{connected?'Systems operational':'Demo data'}</div><div className={`session-timer ${sessionRemaining<=300?'expiring':''}`} role="timer" aria-label={`Automatic logout in ${sessionTime}`}><span>SESSION</span><b>{sessionTime}</b></div><button className="icon-button" aria-label="Search" title="Search" onClick={()=>setToast('Search agents, zones, and dispatches')}><Search size={17} strokeWidth={1.8} aria-hidden="true"/></button><button className="icon-button notification-button" aria-label="Notifications" title="Notifications" onClick={()=>setToast(`${alertRows.length} priority alerts need attention.`)}><Bell size={17} strokeWidth={1.8} aria-hidden="true"/><i/></button><span className="top-avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</span><button className="logout-button" onClick={onLogout}>Log out</button></div></header>
     {view==='overview'?<section className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="pulse"/>{new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'}).format(new Date()).toUpperCase()}<span className="heading-dot"> - </span> LIVE NETWORK</div><h1>{greeting} <span className="wave"></span></h1><p>Here's what's happening across your London network today.</p></div><button className="primary-button" onClick={()=>beginDispatch()}><span></span> New dispatch</button></div>
       <div className="metrics-grid"><article className="metric-card"><div className="metric-top">Active agents<span className="metric-symbol green"></span></div><div className="metric-value">{activeAgents} <span className="metric-unit">/ {summary?.agents?.total||260}</span></div><div className="metric-foot"><span className="trend positive"> 4.8 increase</span><span>vs. last week</span><span className="metric-note"><i className="mini-dot"/>{Math.max(0,(summary?.agents?.total||260)-activeAgents)} offline</span></div><div className="metric-progress"><span style={{width:`${Math.min(100,(activeAgents/(summary?.agents?.total||260))*100)}%`}}/></div></article>
         <article className="metric-card"><div className="metric-top">Network liquidity<span className="metric-symbol blue"></span></div><div className="metric-value">{money(liquidity)}<span className="metric-unit"> total</span></div><div className="metric-foot"><span className="trend positive"> 8.2 increase</span><span>vs. last week</span><span className="metric-note">Across 6 zones</span></div><div className="sparkline"><svg viewBox="0 0 180 28" preserveAspectRatio="none"><path d="M0 22C14 21 15 14 30 17S48 24 62 13 82 20 98 10 116 13 129 7 151 15 162 5 173 7 180 2"/><path className="spark-fill" d="M0 22C14 21 15 14 30 17S48 24 62 13 82 20 98 10 116 13 129 7 151 15 162 5 173 7 180 2V28H0Z"/></svg></div></article>
@@ -523,7 +525,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
  </section>
 }
 
-function CommuterMap(){
+function AdminCommuterMap(){
  const [location,setLocation]=useState(null);
  const [agents,setAgents]=useState([]);
  const [count,setCount]=useState(0);
@@ -589,6 +591,67 @@ function CommuterMap(){
    {selected&&<div className="commuter-selected"><b>{selected.name}</b><span>{selected.place||selected.zone||'Nearby'}  -  {levelName(selected.liquidityLevel)}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.location.coordinates[1]},${selected.location.coordinates[0]}`} target="_blank" rel="noreferrer">Get directions <span aria-hidden="true"></span></a></div>}
   </aside>
  </div>;
+}
+
+function CommuterMap(){
+ const [stats,setStats]=useState(null);
+ const [selectedId,setSelectedId]=useState('');
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState('');
+ const load=async()=>{
+  setLoading(true);setError('');
+  try{
+   const response=await apiFetch('/api/admin/commuter-map/stats');
+   const result=await response.json();
+   if(!response.ok)throw Error(result.error||'Unable to load commuter map activity.');
+   setStats(result);
+   setSelectedId(current=>result.agents.some(agent=>String(agent._id)===current)?current:String(result.agents[0]?._id||''));
+  }catch(problem){setError(problem.message)}finally{setLoading(false)}
+ };
+ useEffect(()=>{load()},[]);
+ const agents=stats?.agents||[];
+ const locatedAgents=agents.filter(agent=>validAgentLocation(agent.location));
+ const bounds=locatedAgents.reduce((value,agent)=>{
+  const [longitude,latitude]=agent.location.coordinates;
+  return {minLongitude:Math.min(value.minLongitude,longitude),maxLongitude:Math.max(value.maxLongitude,longitude),minLatitude:Math.min(value.minLatitude,latitude),maxLatitude:Math.max(value.maxLatitude,latitude)};
+ },{minLongitude:Infinity,maxLongitude:-Infinity,minLatitude:Infinity,maxLatitude:-Infinity});
+ const selected=agents.find(agent=>String(agent._id)===selectedId);
+ const markerPosition=agent=>{
+  const [longitude,latitude]=agent.location.coordinates;
+  const longitudeRange=bounds.maxLongitude-bounds.minLongitude;
+  const latitudeRange=bounds.maxLatitude-bounds.minLatitude;
+  return {left:`${longitudeRange?8+(longitude-bounds.minLongitude)/longitudeRange*84:50}%`,top:`${latitudeRange?8+(bounds.maxLatitude-latitude)/latitudeRange*84:50}%`};
+ };
+ const agentDetails=agent=>[
+  `Name: ${agent.name||'Agent'}`,
+  `Username: ${agent.agent_id||'Not assigned'}`,
+  `Email: ${agent.mobileEmail||'No mobile login'}`,
+  `Phone: ${agent.phone||'Not provided'}`,
+  `Area: ${agent.place||'Not provided'}`,
+  `Zone: ${agent.zone||'Not assigned'}`,
+  `Status: ${agent.mobileLoginActive?'Login enabled':'Login disabled'} - ${agent.status||'unknown'}`
+ ].join('\n');
+ return <section className="page-content alternate-view commuter-admin-page">
+  <div className="page-heading"><div><div className="eyebrow"><span className="pulse"/> COMMUTER ACTIVITY</div><h1>Commuter map</h1><p>Track map usage and view recently active agent locations.</p></div><button className="subtle-button commuter-refresh" onClick={load} disabled={loading}><RefreshCw size={14} aria-hidden="true"/>{loading?'Refreshing':'Refresh'}</button></div>
+  {error&&<p className="commuter-map-error" role="alert">{error}</p>}
+  <div className="metrics-grid commuter-admin-metrics">
+   <article className="metric-card"><div className="metric-top">Map accesses, 30 days<span className="metric-symbol blue"><Activity size={15} aria-hidden="true"/></span></div><div className="metric-value">{stats?.mapAccesses??'-'}</div><div className="metric-foot">Recorded commuter map searches</div></article>
+   <article className="metric-card"><div className="metric-top">Tracked commuter sessions<span className="metric-symbol purple"><Users size={15} aria-hidden="true"/></span></div><div className="metric-value">{stats?.commuterSessions??'-'}</div><div className="metric-foot">Distinct app sessions, 30 days</div></article>
+   <article className="metric-card"><div className="metric-top">Active agents<span className="metric-symbol green"><MapPin size={15} aria-hidden="true"/></span></div><div className="metric-value">{stats?.activeAgents??'-'}</div><div className="metric-foot">{stats?.locatedAgents??0} with a mappable location</div></article>
+  </div>
+  <div className="commuter-admin-layout">
+   <section className="panel commuter-admin-map-panel"><div className="panel-heading"><div><h2>Active agent locations</h2><p>Markers show agent positions reported in the last 15 minutes. Hover or select a pin to view the login profile.</p></div><span className="live-pill"><i/>{stats?.generatedAt?`Updated ${new Date(stats.generatedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:'Waiting for data'}</span></div>
+    <div className="commuter-admin-map" aria-label={`${locatedAgents.length} active agent locations`}>
+     {locatedAgents.map(agent=>{const risk=getRisk(agent);const details=agentDetails(agent);return <button key={agent._id} type="button" className={`commuter-admin-pin ${risk} ${String(agent._id)===selectedId?'selected':''}`} style={markerPosition(agent)} title={details} aria-label={details} onMouseEnter={()=>setSelectedId(String(agent._id))} onFocus={()=>setSelectedId(String(agent._id))} onClick={()=>setSelectedId(String(agent._id))}><MapPin size={22} strokeWidth={2} aria-hidden="true"/></button>})}
+     {!loading&&!locatedAgents.length&&<div className="commuter-admin-empty">No recently active agents have a mapped location.</div>}
+     <div className="commuter-admin-map-note">Last 15 minutes - agent login emails are visible to administrators only.</div>
+    </div>
+   </section>
+   <aside className="panel commuter-admin-agent-panel"><div className="panel-heading"><div><h2>Agent details</h2><p>{selected?'Selected agent login profile':'Hover over a map pin'}</p></div></div>
+    {selected?<dl className="commuter-agent-details"><div><dt>Name</dt><dd>{selected.name||'Agent'}</dd></div><div><dt>Username</dt><dd>{selected.agent_id||'Not assigned'}</dd></div><div><dt>Login email</dt><dd>{selected.mobileEmail||'No mobile login'}</dd></div><div><dt>Phone</dt><dd>{selected.phone||'Not provided'}</dd></div><div><dt>Area</dt><dd>{selected.place||'Not provided'}</dd></div><div><dt>Zone</dt><dd>{selected.zone||'Not assigned'}</dd></div><div><dt>Account</dt><dd><span className={`table-status ${selected.mobileLoginActive?'healthy':'offline'}`}>{selected.mobileLoginActive?'Enabled':'Disabled'}</span></dd></div><div><dt>Agent status</dt><dd>{selected.status||'Unknown'}</dd></div><div><dt>Last seen</dt><dd>{selected.lastSeenAt?new Date(selected.lastSeenAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Not available'}</dd></div></dl>:<p className="commuter-admin-empty-details">Agent login details will appear here when you select a map pin.</p>}
+   </aside>
+  </div>
+ </section>;
 }
 
 function SettlementReports({reports,onReview}) {
@@ -798,7 +861,7 @@ function AlternateView({view,title,agents,distributors,alerts,agentMessages,dist
  {view==='dispatch'&&<section className="panel table-panel dispatch-messages-panel"><div className="panel-heading"><div><h2>Messages with distributors</h2><p>Reply to field updates and coordinate each float transfer.</p></div></div>{dispatches.length?dispatches.map(item=><article className="dispatch-conversation-row" key={`conversation-${item._id}`}><div className="dispatch-conversation-heading"><b>{item.distributor?.name||'Distributor'} <span>to</span> {item.agent?.name||'Agent'}</b><small>{item.agent?.zone||item.agent?.place||'Agent location'}  -  {item.messages?.length||0} messages</small></div><DispatchConversation dispatch={item} onSendMessage={sendDispatchMessage}/></article>):<p className="empty-table">Messages will appear when a distributor is assigned.</p>}</section>}
  {view==='liquidity'&&<><div className="panel map-panel liquidity-map-panel"><div className="panel-heading"><div><h2>Live liquidity heatmap</h2><p>Agent float distribution and recent transaction activity</p></div><span className="live-pill"><i/>Updated {heatmap?.generatedAt?new Date(heatmap.generatedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'-'}</span></div><div className="map-wrap"><div className="map-canvas"><MapArtwork agents={agents} distributors={distributors} onSelect={()=>{}}/><div className="heatmap-caption"><span className="heat-low"/>Low float <span className="heat-mid"/>Medium float <span className="heat-high"/>High float</div></div></div></div><div className="zone-grid">{(analytics?.zoneRisks||[]).map(zone=><div className="zone-card" key={zone._id||'unassigned'}><span>{zone._id||'Unassigned zone'}</span><b>{money(zone.float)}</b><small>{zone.agents} agents  -  {zone.atRisk} at risk</small><div className="zone-bar"><i style={{width:`${Math.min(100,zone.float/Math.max(1,analytics.zoneRisks.reduce((max,z)=>Math.max(max,z.float),0))*100)}%`}}/></div></div>)}</div></>}
  {view==='reports'&&<><SettlementReports reports={settlements} onReview={onReviewSettlement}/><div className="metrics-grid"><Metric label="Events in period" value={analytics?.eventCount||0} accent="blue"/><Metric label="Completed dispatches" value={analytics?.dispatchResponse?.count||0} accent="green"/><Metric label="Average response" value={analytics?.dispatchResponse?.averageResponseMinutes?`${Math.round(analytics.dispatchResponse.averageResponseMinutes)} min`:'-'} accent="purple"/><Metric label="Reporting window" value={`${analytics?.days||7} days`} accent="orange"/></div><div className="panel table-panel"><div className="panel-heading"><div><h2>Operational event timeline</h2><p>Alert, dispatch, replenishment, and commuter search events</p></div></div><div className="table-scroll"><table><thead><tr><th>DATE</th><th>EVENT TYPE</th><th>COUNT</th></tr></thead><tbody>{(analytics?.timeline||[]).map(item=><tr key={`${item._id.day}-${item._id.type}`}><td>{item._id.day}</td><td>{item._id.type.replaceAll('_',' ')}</td><td><b>{item.count}</b></td></tr>)}</tbody></table>{!analytics?.timeline?.length&&<p className="empty-table">Operational analytics will populate as network events arrive.</p>}</div></div><div className="zone-grid">{(analytics?.zoneRisks||[]).map(zone=><div className="zone-card" key={zone._id}><span>{zone._id||'Unassigned zone'}</span><b>{zone.atRisk} agents at risk</b><small>{money(zone.float)} float across {zone.agents} agents</small></div>)}</div></>}
- {view==='commuters'&&<CommuterMap/>}
+ {view==='commuters'&&<AdminCommuterMap/>}
  </section>
 }
 function Metric({label,value,accent}){return <article className="metric-card"><div className="metric-top">{label}<span className={`metric-symbol ${accent}`}></span></div><div className="metric-value">{value}</div></article>}

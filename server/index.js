@@ -1303,6 +1303,35 @@ app.patch('/api/agents/:id/profile', async (req, res) => {
   } catch (error) { apiError(res, error); }
 });
 
+app.get('/api/admin/commuter-map/stats', async (_req, res) => {
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const activeSince = new Date(Date.now() - 15 * 60 * 1000);
+    const activeQuery = { archivedAt: null, status: { $in: ['active', 'at_risk'] }, lastSeenAt: { $gte: activeSince } };
+    const [mapAccesses, commuterSessions, activeAgentCount, agents] = await Promise.all([
+      CommuterLog.countDocuments({ timestamp: { $gte: since } }),
+      CommuterLog.distinct('session_id', { timestamp: { $gte: since } }),
+      Agent.countDocuments(activeQuery),
+      Agent.find(activeQuery).select('name agent_id phone place zone location status lastSeenAt floatBalance floatReference safeThreshold').sort({ name: 1 }).limit(1000).lean()
+    ]);
+    const locatedAgents = agents.filter(agent => validPoint(agent.location));
+    const accounts = await MobileAccount.find({ role: 'agent', agent: { $in: locatedAgents.map(agent => agent._id) } }).select('agent email active').lean();
+    const accountByAgent = new Map(accounts.map(account => [String(account.agent), account]));
+    res.json({
+      periodDays: 30,
+      mapAccesses,
+      commuterSessions: commuterSessions.length,
+      activeAgents: activeAgentCount,
+      locatedAgents: locatedAgents.length,
+      generatedAt: new Date(),
+      agents: locatedAgents.map(agent => {
+        const account = accountByAgent.get(String(agent._id));
+        return { ...agent, mobileEmail: account?.email || '', mobileLoginActive: Boolean(account?.active) };
+      })
+    });
+  } catch (error) { apiError(res, error); }
+});
+
 app.get('/api/commuter/nearby', async (req, res) => {
   try {
     const longitude=Number(req.query.longitude),latitude=Number(req.query.latitude),radius=Math.max(100,Math.min(Number(req.query.radius)||5000,50000));
