@@ -8,7 +8,8 @@ const demoAgents = [
 ].map(([name,place,lon,lat,risk,floatBalance],i)=>({_id:`demo-${i}`,name,place,zone:i<3?'Zone 1':'Zone 2',location:{type:'Point',coordinates:[lon,lat]},floatBalance,status:risk==='critical'?'at_risk':'active',demoRisk:risk}));
 const demoDistributors=[{_id:'d1',name:'Daniel Carter',location:{coordinates:[-0.139,51.516]},status:'available'},{_id:'d2',name:'Priya Sharma',location:{coordinates:[-0.108,51.500]},status:'available'},{_id:'d3',name:'Marcus Lee',location:{coordinates:[-0.087,51.526]},status:'available'}];
 const mapNames={overview:'Overview',agents:'Agent network',distributors:'Distributors',dispatch:'Dispatch',agentMessages:'Agent inbox',distributorInbox:'Distributor inbox',superagentMessages:'Superagent chat',superagentRequests:'Superagent deletion requests',commuters:'Commuter map',liquidity:'Liquidity insights',reports:'Reports',settings:'Settings'};
-const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const defaultRenderBackendUrl = 'https://tap-and-go-float-and-csn-backend.onrender.com';
+const apiBaseUrl = (import.meta.env.VITE_API_URL || (window.location.hostname.endsWith('onrender.com') ? defaultRenderBackendUrl : '')).replace(/\/$/, '');
 const apiUrl = path => apiBaseUrl ? `${apiBaseUrl}${path}` : path;
 const adminSessionKey='tapgo_admin_session';
 function readAdminSession(){
