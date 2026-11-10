@@ -2,15 +2,16 @@
   "name": "tap-and-go-network-operations",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "dev": "npm run dev:api",
-    "dev:api": "node server/index.js",
-    "dev:web": "npm --prefix frontend run dev",
-    "dev:mobile": "npm --prefix mobile start",
-    "dev:stack": "concurrently -k -n api,web \"npm:dev:api\" \"npm:dev:web\"",
-    "seed": "node server/seed.js",
-    "build": "npm --prefix frontend run build"
-  },
+"scripts": {
+  "start": "node server/index.js",
+  "dev": "npm run dev:api",
+  "dev:api": "node server/index.js",
+  "dev:web": "npm --prefix frontend run dev",
+  "dev:mobile": "npm --prefix mobile start",
+  "dev:stack": "concurrently -k -n api,web \"npm:dev:api\" \"npm:dev:web\"",
+  "seed": "node server/seed.js",
+  "build": "npm --prefix frontend run build"
+},
   "dependencies": {
     "axios": "^1.21.1",
     "cors": "^2.8.6",
