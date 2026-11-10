@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Tap & Go Network",
-    "slug": "tap-and-go-network",
+    "slug": "tap-and-go-network-operations",
     "scheme": "tapandgo",
     "version": "1.0.0",
     "orientation": "portrait",
