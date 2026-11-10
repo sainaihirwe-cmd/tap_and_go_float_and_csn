@@ -19,15 +19,20 @@ if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_EMAIL || !proce
   throw new Error('Set ADMIN_EMAIL, ADMIN_PASSWORD, and AUTH_SECRET before running in production.');
 }
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true
-}));
-
 const app = express();
 const server = http.createServer(app);
-const allowedOrigins = (process.env.WEB_ORIGIN || 'http://localhost:5173,http://localhost:3000').split(',').map(origin => origin.trim());
 const io = new Server(server, { cors: { origin: allowedOrigins } });
+const allowedOrigins = [
+  ...(process.env.FRONTEND_URL
+    ? [process.env.FRONTEND_URL.trim()]
+    : []),
+
+  ...(process.env.WEB_ORIGIN ||
+    'http://localhost:5173,http://localhost:3000')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean)
+];
 const sosThreshold = Number(process.env.SOS_THRESHOLD_GBP || 40);
 const distributorLocationMaxAgeMs = 15 * 60 * 1000;
 const dispatchSearchRadiusMeters = 500;
