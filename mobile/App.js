@@ -1092,8 +1092,16 @@ export default function App() {
       {role === 'commuter' && account?.role === 'commuter' && <>
         <View style={styles.accountBar}>
           <View style={styles.flex}><Text style={styles.cardTitle}>{profile?.name}</Text><Text style={styles.cardSub}>{account.email}</Text></View>
-          <TouchableOpacity accessibilityRole="button" onPress={signOut}><Text style={styles.signOut}>{translate(commuterLanguage, 'Sign out')}</Text></TouchableOpacity>
+          <View style={styles.accountActions}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setProfileOpen(value => !value)} style={styles.accountAction}>
+              <Text style={styles.settingsText}>{translate(commuterLanguage, profileOpen ? 'Close settings' : 'Settings')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={signOut} style={styles.accountAction}>
+              <Text style={styles.signOut}>{translate(commuterLanguage, 'Sign out')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+        {profileOpen ? <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/> : <>
         <View style={styles.mapCard}>
           <MapView provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined} style={styles.map}
             initialRegion={london}
@@ -1142,6 +1150,7 @@ export default function App() {
           <Text style={styles.legendLine}><Text style={styles.lowText}>{commuter.low}</Text> — {commuter.lowMeaning}</Text>
           <Text style={styles.help}>{commuter.colorNote}</Text>
         </View>
+        </>}
       </>}
 
       {role !== 'commuter' && account && account.role !== role && <View style={styles.panel}>
@@ -1572,7 +1581,7 @@ function ProfileEditor({ role, profile, email: accountEmail, language, onSaved }
       if ((emailChanged || passwordChanged) && !currentPassword) {
         throw new Error('Enter your current password to change account credentials.');
       }
-      const body = role === 'superagent' ? { name } : { name, phone, place };
+      const body = role === 'superagent' || role === 'commuter' ? { name } : { name, phone, place };
       if (emailChanged) body.email = email.trim();
       if (passwordChanged) body.newPassword = newPassword;
       if (emailChanged || passwordChanged) body.currentPassword = currentPassword;
@@ -1589,7 +1598,7 @@ function ProfileEditor({ role, profile, email: accountEmail, language, onSaved }
   return <View style={styles.panel}>
     <Text style={styles.sectionTitle}>{translate(language, 'Profile details')}</Text>
     <Input label={translate(language, 'Name')} value={name} onChangeText={setName} placeholder={translate(language, 'Your name')} autoCapitalize="words" maxLength={80}/>
-    {role !== 'superagent' && <>
+    {role !== 'superagent' && role !== 'commuter' && <>
       <Input label={translate(language, 'Phone number')} value={phone} onChangeText={setPhone} placeholder={translate(language, 'Your phone number')} keyboardType="phone-pad" maxLength={32}/>
       <Input label={translate(language, 'Location / area')} value={place} onChangeText={setPlace} placeholder={translate(language, 'Your area')} autoCapitalize="words" maxLength={100}/>
     </>}
