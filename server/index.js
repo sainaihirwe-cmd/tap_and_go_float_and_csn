@@ -4,6 +4,7 @@ const http = require('http');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const axios=require('axios')
 const mongoose = require('mongoose');
 const multer = require('multer');
 const { Server } = require('socket.io');
@@ -13,9 +14,15 @@ const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, Commu
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@tapandgo.local';
 const adminPassword = process.env.ADMIN_PASSWORD || 'TapGoDev2026!';
 const authSecret = process.env.AUTH_SECRET || 'local-development-secret-change-before-deploying';
+
 if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.AUTH_SECRET)) {
   throw new Error('Set ADMIN_EMAIL, ADMIN_PASSWORD, and AUTH_SECRET before running in production.');
 }
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
 
 const app = express();
 const server = http.createServer(app);
