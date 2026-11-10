@@ -17,7 +17,7 @@ export function OverviewPage() {
         </article>
         <article className="metric-card">
           <div className="metric-top">Network liquidity <span className="metric-symbol blue">◉</span></div>
-          <div className="metric-value">£645,000</div>
+          <div className="metric-value">FRW 645,000</div>
         </article>
         <article className="metric-card">
           <div className="metric-top">Agents at risk <span className="metric-symbol orange">⚠</span></div>

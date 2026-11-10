@@ -19,7 +19,8 @@ function readAdminSession(){
 }
 function saveAdminSession(session){sessionStorage.setItem(adminSessionKey,JSON.stringify(session))}
 function clearAdminSession(){sessionStorage.removeItem(adminSessionKey)}
-const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(value||0);
+const money=value=>`FRW ${new Intl.NumberFormat('en-GB',{maximumFractionDigits:0}).format(Number(value)||0)}`;
+const displayRecordId=value=>String(value||'').replace(/[^a-zA-Z0-9]/g,'').slice(0,8).toUpperCase()||'N/A';
 const formatShiftDuration=seconds=>{
   const minutes=Math.floor((Number(seconds)||0)/60);
   return `${Math.floor(minutes/60)}h ${minutes%60}m`;
@@ -237,7 +238,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
     let amountAdded;
     let reviewNote='';
     if(status==='approved'){
-      const value=window.prompt(`Verified float amount to credit ${report.agent?.name||'this agent'} (Â£)`,String(report.depositAmount));
+      const value=window.prompt(`Verified float amount to credit ${report.agent?.name||'this agent'} (FRW)`,String(report.depositAmount));
       if(value===null)return;
       amountAdded=Number(value);
       if(!Number.isFinite(amountAdded)||amountAdded<=0){setToast('Enter a positive approved float amount.');return}
@@ -513,7 +514,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
    <label htmlFor="network-phone">Phone number</label><input id="network-phone" maxLength="32" value={phone} onChange={event=>setPhone(event.target.value)} autoComplete="tel"/>
    <label htmlFor="network-place">Location / area</label><input id="network-place" maxLength="100" value={place} onChange={event=>setPlace(event.target.value)} placeholder="Town or operating area"/>
    {role==='agent'&&<><label htmlFor="network-zone">Agent zone</label><select id="network-zone" value={customZone?'__custom__':zone} onChange={event=>{const custom=event.target.value==='__custom__';setCustomZone(custom);setZone(custom?'':event.target.value)}}><option value="">Select an agent zone</option>{zoneOptions.map(option=><option key={option} value={option}>{option}</option>)}<option value="__custom__">Add a new zoneâ€¦</option></select>{customZone&&<input aria-label="New operational zone" required maxLength="80" value={zone} onChange={event=>setZone(event.target.value)} placeholder="Enter new zone"/>}</>}
-   {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (Â£)</label><input id="network-opening-float" type="number" min="0" step="0.01" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
+  {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (FRW)</label><input id="network-opening-float" type="number" min="0" step="1" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
    <label htmlFor="network-email">Sign-in email</label><input id="network-email" type="email" autoComplete="email" maxLength="254" required value={email} onChange={event=>setEmail(event.target.value)}/>
    <label htmlFor="network-password">{record&&record.mobileEmail?'New password (optional)':'Initial password'}</label><input id="network-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required={!record||!record.mobileEmail} value={password} onChange={event=>setPassword(event.target.value)} placeholder={record?.mobileEmail?'Leave blank to keep current password':'At least 12 characters'}/>
    {error&&<div className="profile-form-error" role="alert">{error}</div>}
@@ -778,9 +779,9 @@ function AlternateView({view,title,agents,distributors,alerts,agentMessages,dist
   <div className="panel-heading"><div><h2>{role==='agent'?'Agent':'Distributor'} profiles &amp; mobile logins</h2><p>Create a profile with email/password access, update it, or archive it while keeping historical records.</p></div><label className="archive-toggle"><input type="checkbox" checked={includeArchived} onChange={event=>setIncludeArchived(event.target.checked)}/> Show archived</label></div>
   <div className="table-scroll"><table><thead><tr><th>NAME / ID</th><th>PHONE</th><th>AREA</th><th>ZONE</th><th>MOBILE LOGIN</th><th>STATUS</th>{role==='distributor'&&<th>SHIFT STARTED</th>}<th>ADMIN ACTIONS</th></tr></thead><tbody>
    {listed.map(record=><tr key={record._id}>
-    <td><b>{record.name}</b><small>{role==='agent'?record.agent_id:record.distributor_id}</small></td>
+    <td><b>{record.name}</b><small>ID {displayRecordId(role==='agent'?record.agent_id||record._id:record.distributor_id||record._id)}</small></td>
     <td>{record.phone||'â€”'}</td><td>{record.place||'â€”'}</td><td>{record.zone||'â€”'}</td>
-    <td>{record.mobileEmail||'Not provisioned'}{record.mobileEmail&&<small>{record.mobileLoginActive?'Enabled':'Disabled'}</small>}</td>
+    <td>{record.mobileEmail?<><b className="network-login-email">{record.mobileEmail}</b><small>{record.mobileLoginActive?'Enabled':'Disabled'}</small></>:'Not provisioned'}</td>
     <td>{record.archivedAt?'Archived':record.status}</td>
     {role==='distributor'&&<td>{record.dutyStartedAt?new Date(record.dutyStartedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'â€”'}{record.dutyStartedAt&&<small>{record.status==='offline'?'Last shift started':'On duty since'}</small>}</td>}
     <td className="crud-actions">{!record.archivedAt&&<button className="row-action" onClick={()=>setProfileEditor({role,record})}>Edit</button>}<button className={`row-action ${record.archivedAt?'':'reject-action'}`} onClick={()=>archiveProfile(record)}>{record.archivedAt?'Restore':'Archive'}</button></td>

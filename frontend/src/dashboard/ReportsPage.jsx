@@ -17,7 +17,7 @@ export function ReportsPage() {
               <tr><th>AGENT</th><th>STATUS</th><th>AMOUNT</th><th>REFERENCE</th></tr>
             </thead>
             <tbody>
-              <tr><td>Mary James</td><td>Pending</td><td>£1,250</td><td>REF-2181</td></tr>
+              <tr><td>Mary James</td><td>Pending</td><td>FRW 1,250</td><td>REF-2181</td></tr>
             </tbody>
           </table>
         </div>

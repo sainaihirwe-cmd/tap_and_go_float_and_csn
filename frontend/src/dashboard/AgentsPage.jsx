@@ -26,9 +26,9 @@ export function AgentsPage() {
               </tr>
             </thead>
             <tbody>
-              <tr><td>Mary James</td><td>Zone 1</td><td>£18,240</td><td>Healthy</td><td>03h 42m</td></tr>
-              <tr><td>Kenji Patel</td><td>Zone 2</td><td>£9,800</td><td>Warning</td><td>02h 15m</td></tr>
-              <tr><td>Hugo Santos</td><td>Zone 5</td><td>£4,200</td><td>Critical</td><td>01h 10m</td></tr>
+              <tr><td>Mary James</td><td>Zone 1</td><td>FRW 18,240</td><td>Healthy</td><td>03h 42m</td></tr>
+              <tr><td>Kenji Patel</td><td>Zone 2</td><td>FRW 9,800</td><td>Warning</td><td>02h 15m</td></tr>
+              <tr><td>Hugo Santos</td><td>Zone 5</td><td>FRW 4,200</td><td>Critical</td><td>01h 10m</td></tr>
             </tbody>
           </table>
         </div>
