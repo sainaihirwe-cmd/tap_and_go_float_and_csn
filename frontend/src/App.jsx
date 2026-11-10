@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { io } from 'socket.io-client';
+import { OverviewPage, AgentsPage, DispatchPage, MessagesPage, ReportsPage, SettingsPage } from './dashboard/index.js';
 
 const demoAgents = [
   ['Maya Patel','Soho',-0.133,51.514,'critical',18],['James Cole','Waterloo',-0.113,51.503,'critical',24],['Ella Brooks',"King’s Cross",-0.123,51.531,'critical',32],['Oliver Reed','Shoreditch',-0.078,51.525,'warning',86],['Aisha Khan','Paddington',-0.176,51.516,'warning',110],['Noah Wright','London Bridge',-0.087,51.505,'warning',94],['Isla Green','Covent Garden',-0.123,51.512,'healthy',640],['Leo Turner','Islington',-0.103,51.537,'healthy',820],['Sofia Ali','Victoria',-0.144,51.496,'healthy',520],['Theo James','Camden',-0.143,51.539,'healthy',735]
 ].map(([name,place,lon,lat,risk,floatBalance],i)=>({_id:`demo-${i}`,name,place,zone:i<3?'Zone 1':'Zone 2',location:{type:'Point',coordinates:[lon,lat]},floatBalance,status:risk==='critical'?'at_risk':'active',demoRisk:risk}));
 const demoDistributors=[{_id:'d1',name:'Daniel Carter',location:{coordinates:[-0.139,51.516]},status:'available'},{_id:'d2',name:'Priya Sharma',location:{coordinates:[-0.108,51.500]},status:'available'},{_id:'d3',name:'Marcus Lee',location:{coordinates:[-0.087,51.526]},status:'available'}];
 const mapNames={overview:'Overview',agents:'Agent network',distributors:'Distributors',dispatch:'Dispatch',agentMessages:'Agent inbox',distributorInbox:'Distributor inbox',superagentMessages:'Superagent chat',superagentRequests:'Superagent deletion requests',commuters:'Commuter map',liquidity:'Liquidity insights',reports:'Reports',settings:'Settings'};
+const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(value||0);
 const formatShiftDuration=seconds=>{
   const minutes=Math.floor((Number(seconds)||0)/60);
@@ -20,7 +22,10 @@ const agentLowFloatThreshold=agent=>Math.max(10000,Number(agent.floatReference||
 const getRisk=agent=>agent.demoRisk||(agent.floatBalance<=agentLowFloatThreshold(agent)?'critical':agent.floatBalance<=agentLowFloatThreshold(agent)*2?'warning':'healthy');
 const accountDisplayName=email=>String(email||'').split('@')[0].replace(/[._-]+/g,' ').trim().split(/\s+/).filter(Boolean).map(part=>part.charAt(0).toUpperCase()+part.slice(1)).join(' ')||'Administrator';
 async function apiFetch(input,options={}){
-  const response=await fetch(input,{...options,credentials:'same-origin'});
+  const resolvedInput = typeof input === 'string' && input.startsWith('/') && apiBaseUrl
+    ? `${apiBaseUrl}${input}`
+    : input;
+  const response=await fetch(resolvedInput,{...options,credentials:'same-origin'});
   if(response.status===401){window.dispatchEvent(new Event('tapgo:session-expired'));throw Error('Your session expired. Please sign in again.')}
   return response;
 }
@@ -131,7 +136,11 @@ function Dashboard({admin,onLogout,onProfileSaved}){
     return()=>{active=false};
   },[modal,selectedAgent,dispatchOptionsRefresh]);
   useEffect(()=>{
-    const socket=io({autoConnect:false,withCredentials:true});
+    const socket = io(apiBaseUrl || window.location.origin, {
+      autoConnect: false,
+      withCredentials: true,
+      transports: ['websocket', 'polling']
+    });
     socket.on('connect',()=>setConnected(true));
     socket.on('disconnect',()=>setConnected(false));
     socket.on('agent:telemetry',agent=>setAgents(current=>current.map(a=>a._id===agent._id?agent:a)));

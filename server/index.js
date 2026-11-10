@@ -19,20 +19,25 @@ if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_EMAIL || !proce
   throw new Error('Set ADMIN_EMAIL, ADMIN_PASSWORD, and AUTH_SECRET before running in production.');
 }
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: allowedOrigins } });
 const allowedOrigins = [
   ...(process.env.FRONTEND_URL
     ? [process.env.FRONTEND_URL.trim()]
     : []),
-
-  ...(process.env.WEB_ORIGIN ||
-    'http://localhost:5173,http://localhost:3000')
+  ...(process.env.WEB_ORIGIN || 'http://localhost:5173,http://localhost:3000')
     .split(',')
     .map(origin => origin.trim())
     .filter(Boolean)
 ];
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true
+  }
+});
+
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
@@ -52,7 +57,6 @@ const bankSlipUpload = multer({
 });
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 
