@@ -92,6 +92,7 @@ const roleCopy = {
     'Agent, Distributor or Superagent sign in':'Agent, Distributor or Superagent sign in','Back to commuter account':'Back to commuter account',
     'Home':'Home','Messages':'Messages','Settings':'Settings','Close settings':'Close settings','Messages & support':'Messages & support',
     'Superagent network':'Superagent network','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Manage only the agents assigned to you. POS accounts remain administrator-managed.',
+    'Agent float support requests':'Agent float support requests','No float support requests from assigned agents.':'No float support requests from assigned agents.','Float support requested by':'Float support requested by','an assigned agent':'an assigned agent',
     'Your assigned agents':'Your assigned agents','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.',
     'Add agent':'Add agent','Edit agent profile':'Edit agent profile','New agent profile':'New agent profile','Agent name':'Agent name','Operating area':'Operating area',
     'Zone':'Zone','Agent zone':'Agent zone','The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.':'The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.',
@@ -147,6 +148,7 @@ const roleCopy = {
     'Agent, Distributor or Superagent sign in':'Kwinjira kw’umukozi, utanga amafaranga cyangwa superagent','Back to commuter account':'Subira kuri konti y’umugenzi',
     'Home':'Ahabanza','Messages':'Ubutumwa','Settings':'Igenamiterere','Close settings':'Funga igenamiterere','Messages & support':'Ubutumwa n’ubufasha',
     'Superagent network':'Urusobe rwa superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Ushobora gucunga abakozi bahawe konti yawe gusa. Umuyobozi ni we ucunga konti za POS.',
+    'Agent float support requests':'Ubutumwa bwo kongererwa amafaranga','No float support requests from assigned agents.':'Nta butumwa bwo gusaba amafaranga buvuye ku bakozi wagenewe.','Float support requested by':'Gusaba kongererwa amafaranga byakozwe na','an assigned agent':'umukozi wagenewe',
     'Messages with your Superagent':'Ubutumwa na superagent wawe','Messages with assigned agents':'Ubutumwa n’abakozi wagenewe',
     'No messages with your Superagent yet.':'Nta butumwa urabona bwa superagent wawe.','Message your Superagent':'Andikira superagent wawe',
     'No active Superagent is assigned to your account. Ask an administrator to assign one in Settings before sending a message.':'Nta superagent uhabwa konti yawe. Saba umuyobozi kuguhuza na superagent muri Igenamiterere mbere yo kohereza ubutumwa.',
@@ -247,6 +249,7 @@ const roleCopy = {
     'Agent, Distributor or Superagent sign in':'Connexion agent, distributeur ou Superagent','Back to commuter account':'Retour au compte voyageur',
     'Home':'Accueil','Messages':'Messages','Settings':'Paramètres','Close settings':'Fermer les paramètres','Messages & support':'Messages et assistance',
     'Superagent network':'Réseau Superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Gérez uniquement les agents qui vous sont attribués. Les comptes POS restent gérés par l’administrateur.',
+    'Agent float support requests':'Demandes de réapprovisionnement des agents','No float support requests from assigned agents.':'Aucune demande de réapprovisionnement des agents attribués.','Float support requested by':'Demande de réapprovisionnement envoyée par','an assigned agent':'un agent attribué',
     'Messages with your Superagent':'Messages avec votre Superagent','Messages with assigned agents':'Messages avec les agents attribués',
     'No messages with your Superagent yet.':'Aucun message avec votre Superagent pour le moment.','Message your Superagent':'Écrire à votre Superagent',
     'No active Superagent is assigned to your account. Ask an administrator to assign one in Settings before sending a message.':'Aucun Superagent actif ne vous est attribué. Demandez à un administrateur de vous en attribuer un dans les paramètres avant d’envoyer un message.',
@@ -448,6 +451,8 @@ export default function App() {
   const [ticketSaleBusy, setTicketSaleBusy] = useState(false);
   const ticketSaleInProgress = useRef(false);
   const [supportMessage, setSupportMessage] = useState('');
+  const [supportBusy, setSupportBusy] = useState(false);
+  const supportRequestInProgress = useRef(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [bankReference, setBankReference] = useState('');
   const [settlementNotes, setSettlementNotes] = useState('');
@@ -1000,6 +1005,9 @@ export default function App() {
   }
 
   async function requestFloatSupport() {
+    if (supportRequestInProgress.current) return;
+    supportRequestInProgress.current = true;
+    setSupportBusy(true);
     try {
       const current = await locate();
       const result = await api(`/api/agents/${encodeURIComponent(profileId)}/support`, {
@@ -1016,6 +1024,9 @@ export default function App() {
         : translate(commuterLanguage, 'Support request sent. An administrator will review it and assign a distributor.'));
     } catch (problem) {
       flash(translate(commuterLanguage, problem.message));
+    } finally {
+      supportRequestInProgress.current = false;
+      setSupportBusy(false);
     }
   }
 
@@ -1344,7 +1355,7 @@ export default function App() {
             <Text style={styles.help}>{translate(commuterLanguage, 'Send an urgent support request to network operations. Your current GPS location is included so an available distributor can be assigned.')}</Text>
             <Input label={translate(commuterLanguage, 'Message (optional)')} value={supportMessage} onChangeText={setSupportMessage}
               placeholder={translate(commuterLanguage, 'Tell operations what you need')} multiline maxLength={500}/>
-            <ActionButton onPress={requestFloatSupport}>{translate(commuterLanguage, 'Request float support')}</ActionButton>
+            <ActionButton onPress={requestFloatSupport} disabled={supportBusy}>{translate(commuterLanguage, supportBusy ? 'Sending…' : 'Request float support')}</ActionButton>
           </View>
         </>}
 
@@ -1409,6 +1420,7 @@ function formatAgentDistance(distanceMeters, language = 'en') {
 function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [agents, setAgents] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [floatSupportRequests, setFloatSupportRequests] = useState([]);
   const [inboxMessages, setInboxMessages] = useState([]);
   const [inboxDraft, setInboxDraft] = useState('');
   const [inboxSending, setInboxSending] = useState(false);
@@ -1428,16 +1440,18 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
-    const [agentRows, deletionRequests, inbox, conversations] = await Promise.all([
+    const [agentRows, deletionRequests, inbox, conversations, floatRequests] = await Promise.all([
       api('/api/agents'),
       api('/api/superagent/deletion-requests'),
       api('/api/superagent/inbox'),
-      api('/api/superagent/agent-inboxes')
+      api('/api/superagent/agent-inboxes'),
+      api('/api/superagent/float-requests')
     ]);
     setAgents(agentRows);
     setRequests(deletionRequests);
     setInboxMessages(inbox.messages || []);
     setAgentInboxes(conversations);
+    setFloatSupportRequests(floatRequests);
     setSelectedAgentId(current => conversations.some(item => String(item.agent._id) === current)
       ? current
       : String(conversations[0]?.agent._id || ''));
@@ -1448,17 +1462,19 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
     let socket;
     const load = async () => {
       try {
-        const [agentRows, deletionRequests, inbox, conversations] = await Promise.all([
+        const [agentRows, deletionRequests, inbox, conversations, floatRequests] = await Promise.all([
           api('/api/agents'),
           api('/api/superagent/deletion-requests'),
           api('/api/superagent/inbox'),
-          api('/api/superagent/agent-inboxes')
+          api('/api/superagent/agent-inboxes'),
+          api('/api/superagent/float-requests')
         ]);
         if (active) {
           setAgents(agentRows);
           setRequests(deletionRequests);
           setInboxMessages(inbox.messages || []);
           setAgentInboxes(conversations);
+          setFloatSupportRequests(floatRequests);
           setSelectedAgentId(current => conversations.some(item => String(item.agent._id) === current)
             ? current
             : String(conversations[0]?.agent._id || ''));
@@ -1483,6 +1499,10 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
           ? { ...conversation, messages: [...conversation.messages.filter(item => item.sentAt !== event.message.sentAt), event.message].slice(-200), updatedAt: event.message.sentAt }
           : conversation));
         if (event.message?.sender === 'agent') onMessage(translate(language, 'New message from an assigned agent.'));
+      });
+      socket.on('superagent:float-support-request', request => {
+        setFloatSupportRequests(current => [request, ...current.filter(item => String(item._id) !== String(request._id))].slice(0, 100));
+        onMessage(`${translate(language, 'Float support requested by')} ${request.agent?.name || translate(language, 'an assigned agent')}.`);
       });
       socket.on('superagent:deletion-request-updated', request => {
         setRequests(current => [request, ...current.filter(item => item._id !== request._id)]);
@@ -1687,6 +1707,15 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
           emptyText="No messages with this agent yet."
           placeholder="Message this agent"
         />}
+      </View>
+      <View style={styles.panel}>
+        <Text style={styles.cardTitle}>{translate(language, 'Agent float support requests')}</Text>
+        {floatSupportRequests.length ? floatSupportRequests.map(request => <View key={request._id} style={styles.requestReasonBox}>
+          <Text style={styles.cardTitle}>{request.agent?.name || translate(language, 'Agent')}</Text>
+          <Text style={styles.cardSub}>{request.agent?.place || request.agent?.zone || translate(language, 'Location not set')} · {translate(language, 'Current float')} {currency(request.agent?.floatBalance)}</Text>
+          <Text style={styles.help}>{request.message}</Text>
+          <Text style={styles.cardSub}>{request.supportRequestedAt ? new Date(request.supportRequestedAt).toLocaleString() : ''}</Text>
+        </View>) : <Text style={styles.help}>{translate(language, 'No float support requests from assigned agents.')}</Text>}
       </View>
     </> : <>
       <Text style={styles.sectionTitle}>{translate(language, 'Deletion request history')}</Text>

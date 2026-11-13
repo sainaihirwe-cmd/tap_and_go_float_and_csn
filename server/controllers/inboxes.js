@@ -182,6 +182,21 @@ app.get('/api/superagent/agent-inboxes', async (req, res) => {
   } catch (error) { apiError(res, error); }
 });
 
+app.get('/api/superagent/float-requests', async (req, res) => {
+  try {
+    const agentIds = req.mobile.account.managedAgents || [];
+    const requests = await Alert.find({
+      agent: { $in: agentIds },
+      supportRequestedAt: { $ne: null }
+    })
+      .populate('agent', 'name agent_id place zone floatBalance')
+      .sort({ supportRequestedAt: -1 })
+      .limit(100)
+      .lean();
+    res.json(requests);
+  } catch (error) { apiError(res, error); }
+});
+
 app.post('/api/superagent/agents/:agentId/inbox', async (req, res) => {
   try {
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';

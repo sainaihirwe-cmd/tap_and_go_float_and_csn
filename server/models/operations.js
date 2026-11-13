@@ -39,6 +39,7 @@ const alertSchema = new mongoose.Schema({
   message: { type: String, default: '', maxlength: 500 },
   location: optionalPoint,
   state: { type: String, enum: ['open', 'dispatched', 'resolved'], default: 'open' },
+  supportRequestedAt: { type: Date, default: null },
   resolved_status: { type: Boolean, default: false },
   assigned_distributor_id: { type: String, default: '' },
   triggeredAt: { type: Date, default: Date.now },

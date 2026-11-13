@@ -1,5 +1,5 @@
 module.exports = (context) => {
-  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
+  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, triggerSos, notifyLowFloat, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
 app.post('/api/admin/agents/:id/dispatch', async (req, res) => {
   try {
     const instructions = normalizeDispatchInstructions(req.body?.instructions) ||
@@ -308,10 +308,31 @@ app.post('/api/agents/:id/support', async (req, res) => {
     );
     if (!agent) return res.status(404).json({ error: 'Agent not found.' });
     const alert = await triggerSos(agent, message || 'Agent requested float support.');
+    alert.supportRequestedAt = new Date();
+    await alert.save();
+    const superagent = await MobileAccount.findOne({
+      role: 'superagent', active: true, managedAgents: agent._id
+    }).select('_id').lean();
+    if (superagent) {
+      io.to(`mobile:${superagent._id}`).emit('superagent:float-support-request', {
+        _id: String(alert._id),
+        agent: {
+          _id: String(agent._id),
+          name: agent.name,
+          place: agent.place,
+          zone: agent.zone,
+          floatBalance: agent.floatBalance
+        },
+        message: alert.message,
+        state: alert.state,
+        balanceAtTrigger: alert.balanceAtTrigger,
+        supportRequestedAt: alert.supportRequestedAt
+      });
+    }
     const dispatch = await Dispatch.findOne({ alert: alert._id, status: { $in: ['assigned', 'en_route'] } })
       .populate('distributor', 'name phone location status').lean();
     res.status(202).json({
-      alert: { id: String(alert._id), state: alert.state, message: alert.message },
+      alert: { id: String(alert._id), state: alert.state, message: alert.message, supportRequestedAt: alert.supportRequestedAt },
       distributor: dispatch?.distributor || null
     });
   } catch (error) { apiError(res, error); }
