@@ -21,7 +21,7 @@ const distributors = [
 
 async function seed() {
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/tap_and_go');
-  const threshold=Number(process.env.SOS_THRESHOLD_GBP||40);
+  const threshold=Number(process.env.SOS_THRESHOLD_RWF||process.env.SOS_THRESHOLD_GBP||40);
   const alertAgents=[];
   for (const [index,[name,place,zone,longitude,latitude,floatBalance]] of agents.entries()) {
     const id=name.toLowerCase().replace(/[^a-z0-9]+/g,'-');

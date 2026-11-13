@@ -101,7 +101,7 @@ app.get('/api/commuter/nearby', async (req, res) => {
       agents: agents.map(agent => {
         const { floatBalance, floatReference, safeThreshold, ...publicAgent } = agent;
         const threshold = Math.max(
-          Number(safeThreshold) || Number(process.env.SOS_THRESHOLD_GBP || 40),
+          Number(safeThreshold) || Number(process.env.SOS_THRESHOLD_RWF || process.env.SOS_THRESHOLD_GBP || 40),
           10000,
           (Number(floatReference) || 0) * 0.1
         );
@@ -253,7 +253,7 @@ async function triggerSos(agent, message = '') {
 function lowFloatAlertMessage(agent) {
   const amount = Number(agent.floatBalance).toLocaleString('en-GB');
   const threshold = lowFloatThreshold(agent).toLocaleString('en-GB');
-  return `Automatic low-float alert: £${amount} remains (low-float threshold £${threshold}). Please arrange a float transfer.`;
+  return `Automatic low-float alert: RWF ${amount} remains (low-float threshold RWF ${threshold}). Please arrange a float transfer.`;
 }
 
 async function notifyLowFloat(agent) {

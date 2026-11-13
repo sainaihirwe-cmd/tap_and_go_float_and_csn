@@ -9,7 +9,7 @@ function createServerConfig(env = process.env) {
 
   return {
     allowedOrigins,
-    sosThreshold: Number(env.SOS_THRESHOLD_GBP || 40),
+    sosThreshold: Number(env.SOS_THRESHOLD_RWF || env.SOS_THRESHOLD_GBP || 40),
     distributorLocationMaxAgeMs: 15 * 60 * 1000,
     dispatchSearchRadiusMeters: 500,
     adminEmail: env.ADMIN_EMAIL || 'admin@tapandgo.local',

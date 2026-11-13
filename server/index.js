@@ -34,7 +34,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
-const sosThreshold = Number(process.env.SOS_THRESHOLD_GBP || 40);
+const sosThreshold = Number(process.env.SOS_THRESHOLD_RWF || process.env.SOS_THRESHOLD_GBP || 40);
 const distributorLocationMaxAgeMs = 15 * 60 * 1000;
 const dispatchSearchRadiusMeters = 500;
 const bankSlipUpload = multer({

@@ -21,7 +21,7 @@ function readAdminSession(){
 }
 function saveAdminSession(session){sessionStorage.setItem(adminSessionKey,JSON.stringify(session))}
 function clearAdminSession(){sessionStorage.removeItem(adminSessionKey)}
-const money=value=>`FRW ${new Intl.NumberFormat('en-GB',{maximumFractionDigits:0}).format(Number(value)||0)}`;
+const money=value=>new Intl.NumberFormat('en-RW',{style:'currency',currency:'RWF',currencyDisplay:'code',maximumFractionDigits:0}).format(Number(value)||0);
 const displayRecordId=value=>String(value||'').replace(/[^a-zA-Z0-9]/g,'').slice(0,8).toUpperCase()||'N/A';
 const formatShiftDuration=seconds=>{
   const minutes=Math.floor((Number(seconds)||0)/60);
@@ -242,7 +242,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
     let amountAdded;
     let reviewNote='';
     if(status==='approved'){
-      const value=window.prompt(`Verified float amount to credit ${report.agent?.name||'this agent'} (FRW)`,String(report.depositAmount));
+      const value=window.prompt(`Verified float amount to credit ${report.agent?.name||'this agent'} (RWF)`,String(report.depositAmount));
       if(value===null)return;
       amountAdded=Number(value);
       if(!Number.isFinite(amountAdded)||amountAdded<=0){setToast('Enter a positive approved float amount.');return}
@@ -545,7 +545,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
    <label htmlFor="network-phone">Phone number</label><input id="network-phone" maxLength="32" value={phone} onChange={event=>setPhone(event.target.value)} autoComplete="tel"/>
    <label htmlFor="network-place">Location / area</label><input id="network-place" maxLength="100" value={place} onChange={event=>setPlace(event.target.value)} placeholder="Town or operating area"/>
    {role==='agent'&&<><label htmlFor="network-zone">Agent zone</label><select id="network-zone" value={customZone?'__custom__':zone} onChange={event=>{const custom=event.target.value==='__custom__';setCustomZone(custom);setZone(custom?'':event.target.value)}}><option value="">Select an agent zone</option>{zoneOptions.map(option=><option key={option} value={option}>{option}</option>)}<option value="__custom__">Add a new zone...</option></select>{customZone&&<input aria-label="New operational zone" required maxLength="80" value={zone} onChange={event=>setZone(event.target.value)} placeholder="Enter new zone"/>}</>}
-  {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (FRW)</label><input id="network-opening-float" type="number" min="0" step="1" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
+  {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (RWF)</label><input id="network-opening-float" type="number" min="0" step="1" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
    <label htmlFor="network-email">Sign-in email</label><input id="network-email" type="email" autoComplete="email" maxLength="254" required value={email} onChange={event=>setEmail(event.target.value)}/>
    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button type="button" className="subtle-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={busy}>{busy?'Saving...':record?'Save changes':`Create ${role} & login`}</button></div>

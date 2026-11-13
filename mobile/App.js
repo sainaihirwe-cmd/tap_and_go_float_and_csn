@@ -21,7 +21,7 @@ const API = (configuredApiUrl || (__DEV__ ? developmentApiUrl : 'https://tap-and
 const TRACKING_TASK = 'tap-and-go-location';
 const LOCATION_PERMISSION_DENIED = 'TAPGO_LOCATION_PERMISSION_DENIED';
 const london = { latitude: 51.5074, longitude: -0.1278, latitudeDelta: 0.085, longitudeDelta: 0.085 };
-const currency = value => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(Number(value) || 0);
+const currency = value => new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', currencyDisplay: 'code' }).format(Number(value) || 0);
 const commuterCopy = {
   en: {
     role: 'Commuter', title: 'Find an agent', subtitle: 'Nearby ticket top-ups, without the guesswork.',
@@ -113,7 +113,7 @@ const roleCopy = {
     'Commuter account created. Welcome, {name}.':'Commuter account created. Welcome, {name}.','Signed in: {name}.':'Signed in: {name}.',
     'How to sell a ticket':'How to sell a ticket',
     'Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.':'Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.',
-    'Example: £10 float − £2 ticket = £8 remaining. A sale above your available float is rejected.':'Example: £10 float − £2 ticket = £8 remaining. A sale above your available float is rejected.',
+    'Example: RWF 10,000 float − RWF 2,000 ticket = RWF 8,000 remaining. A sale above your available float is rejected.':'Example: RWF 10,000 float − RWF 2,000 ticket = RWF 8,000 remaining. A sale above your available float is rejected.',
     'Recording sale…':'Recording sale…',
     'How tasks work':'How tasks work',
     'Refresh GPS now':'Refresh GPS now',
@@ -167,13 +167,13 @@ const roleCopy = {
     'Save profile':'Bika imyirondoro','Saving profile…':'Urimo kubika imyirondoro…','Profile updated successfully.':'Imyirondoro yahinduwe neza.',
     'AVAILABLE DIGITAL FLOAT':'AMAFARANGA AHARI YO KUGURISHA','Low-float alert threshold':'Igipimo cy’amafaranga make bwoherezwaho ubutumwa','Float exhausted — support alert sent':'Amafaranga yo kugurisha yashize — ubutumwa bwo gusaba ubufasha bwoherejwe',
     'Float is running low':'Amafaranga yo kugurisha ari kugabanuka','Low float is reported to operations automatically when a sale is recorded. Open Messages to explain a problem or request an urgent top-up.':'Iyo amafaranga yo kugurisha agabanutse, ubuyobozi burabimenyeshwa. Kanda Ubutumwa usobanure ikibazo cyangwa usabe kongererwa amafaranga byihuse.',
-    'Commuter ticket sale (£)':'Amafaranga y’itike yagurishijwe (£)','Amount paid from float':'Amafaranga yakoreshejwe','Record ticket sale':'Andika itike yagurishijwe',
-    'How to sell a ticket':'Uko wandika itike yagurishijwe','Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.':'Andika amafaranga y’itike, ukande Andika itike yagurishijwe. Ayo mafaranga ahita avanwa ku yo ufite kandi asigaranye akavugururwa.','Example: £10 float − £2 ticket = £8 remaining. A sale above your available float is rejected.':'Urugero: £10 wari ufite − £2 y’itike = £8 asigara. Ntushobora kwandika itike irenze amafaranga ufite.','Recording sale…':'Irimo kwandika itike…',
+    'Commuter ticket sale (RWF)':'Amafaranga y’itike yagurishijwe (RWF)','Amount paid from float':'Amafaranga yakoreshejwe','Record ticket sale':'Andika itike yagurishijwe',
+    'How to sell a ticket':'Uko wandika itike yagurishijwe','Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.':'Andika amafaranga y’itike, ukande Andika itike yagurishijwe. Ayo mafaranga ahita avanwa ku yo ufite kandi asigaranye akavugururwa.','Example: RWF 10,000 float − RWF 2,000 ticket = RWF 8,000 remaining. A sale above your available float is rejected.':'Urugero: RWF 10,000 wari ufite − RWF 2,000 y’itike = RWF 8,000 asigara. Ntushobora kwandika itike irenze amafaranga ufite.','Recording sale…':'Irimo kwandika itike…',
     'Recording a sale deducts it from your available float and helps operations see how much service each agent provides to commuters.':'Kwandika itike bigabanya amafaranga usigaranye kandi bifasha ubuyobozi kumenya serivisi uha abagenzi.',
     'Stop background location':'Hagarika kohereza aho uri','Enable background SOS monitoring':'Fungura gukurikirana ubutabazi',    'When enabled, this device sends GPS to operations. Float changes are recorded only through ticket sales and distributor top-ups; low balances trigger an SOS alert for an administrator to review and assign a distributor.':'Iyo bifunguye, telefone yohereza aho uri ku buyobozi. Amafaranga ahinduka iyo wanditse itike cyangwa kongererwa amafaranga; iyo agabanutse ubuyobozi buramenyeshwa kugira ngo umuyobozi abigenzure agene utanga amafaranga.',
     'Contact network operations':'Vugana n’ubuyobozi bw’urusobe','Request a float top-up or tell the admin what support you need. Your current GPS position is included so an available distributor can be assigned.':'Saba kongererwa amafaranga cyangwa ubwire umuyobozi ubufasha ukeneye. Aho uri hazoherezwa kugira ngo hagushakirwe ugufasha.',
     'Message (optional)':'Ubutumwa (si ngombwa)','Tell operations what you need':'Sobanurira ubuyobozi icyo ukeneye','Request float support':'Saba kongererwa amafaranga',
-    'End-of-day bank settlement':'Raporo yo kubitsa amafaranga ya nimugoroba','Amount deposited (£)':'Amafaranga wabikije (£)','Bank deposit reference':'Kode yo kubitsa muri banki',
+    'End-of-day bank settlement':'Raporo yo kubitsa amafaranga ya nimugoroba','Amount deposited (RWF)':'Amafaranga wabikije (RWF)','Bank deposit reference':'Kode yo kubitsa muri banki',
     'Notes (optional)':'Ibisobanuro (si ngombwa)','Attach bank-slip photo':'Ongeraho ifoto ya fagitire ya banki','Change bank-slip photo':'Hindura ifoto ya fagitire ya banki',
     'Submit end-of-day settlement':'Ohereza raporo yo kubitsa','Recent settlement reports':'Raporo ziheruka','No settlement reports submitted yet.':'Nta raporo watanga kugeza ubu.',
     'Assigned replenishments':'Imirimo yo kugeza amafaranga','No active assignments':'Nta mirimo ufite ubu','Stay on duty so operations can find you and assign a nearby agent.':'Komeza uri ku kazi kugira ngo ubuyobozi bukubone kandi bukugene ku agenti uri hafi.',
@@ -189,7 +189,7 @@ const roleCopy = {
     'Your shift':'Igihe cy’akazi','Go on duty & share GPS':'Tangira akazi wohereze aho uri','End shift':'Soza akazi','Refresh tasks':'Kongera kureba imirimo',
     'Refresh GPS now':'Ongera wohereze aho uri','GPS refreshed. Operations can now find you nearby.':'Aho uri havuguruwe. Ubuyobozi bushobora kukubona hafi yabo.',
     'Live location is shared with operations.':'Aho uri herekanwa ku buyobozi.',
-    'Current float':'Amafaranga asigaranye','Float added (£)':'Amafaranga wongereye kuri POS (£)','Amount replenished':'Amafaranga wongeyeho','Open navigation':'Fungura inzira','Complete top-up':'Emeza ko wongereye amafaranga','Recording top-up…':'Irimo kwandika amafaranga…','Top-up recorded:':'Amafaranga wongeyeho yanditswe:','Agent POS float now:':'Amafaranga agenti afite kuri POS ubu:',
+    'Current float':'Amafaranga asigaranye','Float added (RWF)':'Amafaranga wongereye kuri POS (RWF)','Amount replenished':'Amafaranga wongeyeho','Open navigation':'Fungura inzira','Complete top-up':'Emeza ko wongereye amafaranga','Recording top-up…':'Irimo kwandika amafaranga…','Top-up recorded:':'Amafaranga wongeyeho yanditswe:','Agent POS float now:':'Amafaranga agenti afite kuri POS ubu:',
     'EN ROUTE':'ARI MU NZIRA','ASSIGNED':'YAGENEWE','Agent needing float':'Agenti ukeneye amafaranga','London':'Londres',
     'Status':'Uko ahagaze','offline':'ntari ku kazi','Tap & Go · London network':'Tap & Go · Urusobe rw’i Londres',
     'used':'yakoreshejwe','deposited':'yabikijwe','Admin':'Umuyobozi',
@@ -262,13 +262,13 @@ const roleCopy = {
     'Save profile':'Enregistrer le profil','Saving profile…':'Enregistrement du profil…','Profile updated successfully.':'Profil mis à jour.',
     'AVAILABLE DIGITAL FLOAT':'FONDS NUMÉRIQUES DISPONIBLES','Low-float alert threshold':'Seuil d’alerte de fonds faibles','Float exhausted — support alert sent':'Fonds épuisés — alerte envoyée',
     'Float is running low':'Fonds en baisse','Low float is reported to operations automatically when a sale is recorded. Open Messages to explain a problem or request an urgent top-up.':'Une faible réserve est signalée automatiquement après une vente. Ouvrez Messages pour expliquer un problème ou demander un réapprovisionnement urgent.',
-    'Commuter ticket sale (£)':'Vente de titres de transport (£)','Amount paid from float':'Montant payé avec les fonds','Record ticket sale':'Enregistrer une vente',
-    'How to sell a ticket':'Comment enregistrer une vente','Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.':'Saisissez le montant du titre puis appuyez sur Enregistrer une vente. Le montant est automatiquement déduit de vos fonds disponibles et le solde est mis à jour.','Example: £10 float − £2 ticket = £8 remaining. A sale above your available float is rejected.':'Exemple : 10 £ de fonds − 2 £ de vente = 8 £ restants. Une vente supérieure à vos fonds disponibles est refusée.','Recording sale…':'Enregistrement de la vente…',
+    'Commuter ticket sale (RWF)':'Vente de titres de transport (RWF)','Amount paid from float':'Montant payé avec les fonds','Record ticket sale':'Enregistrer une vente',
+    'How to sell a ticket':'Comment enregistrer une vente','Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.':'Saisissez le montant du titre puis appuyez sur Enregistrer une vente. Le montant est automatiquement déduit de vos fonds disponibles et le solde est mis à jour.','Example: RWF 10,000 float − RWF 2,000 ticket = RWF 8,000 remaining. A sale above your available float is rejected.':'Exemple : RWF 10 000 de fonds − RWF 2 000 de vente = RWF 8 000 restants. Une vente supérieure à vos fonds disponibles est refusée.','Recording sale…':'Enregistrement de la vente…',
     'Recording a sale deducts it from your available float and helps operations see how much service each agent provides to commuters.':'Chaque vente est déduite de votre réserve et permet à l’équipe de suivre les services rendus aux voyageurs.',
     'Stop background location':'Arrêter le partage de position','Enable background SOS monitoring':'Activer le suivi SOS en arrière-plan','When enabled, this device sends GPS to operations. Float changes are recorded only through ticket sales and distributor top-ups; low balances trigger an SOS alert for an administrator to review and assign a distributor.':'Lorsque cette option est activée, votre position GPS est transmise à l’équipe. Les ventes et réapprovisionnements enregistrent les mouvements de fonds ; un solde faible déclenche une alerte SOS que l’administrateur examine avant d’affecter un distributeur.',
     'Contact network operations':'Contacter l’équipe réseau','Request a float top-up or tell the admin what support you need. Your current GPS position is included so an available distributor can be assigned.':'Demandez un réapprovisionnement ou décrivez l’aide nécessaire. Votre position GPS permet d’affecter un distributeur disponible.',
     'Message (optional)':'Message (facultatif)','Tell operations what you need':'Indiquez votre besoin à l’équipe','Request float support':'Demander un réapprovisionnement',
-    'End-of-day bank settlement':'Dépôt bancaire de fin de journée','Amount deposited (£)':'Montant déposé (£)','Bank deposit reference':'Référence du dépôt bancaire',
+    'End-of-day bank settlement':'Dépôt bancaire de fin de journée','Amount deposited (RWF)':'Montant déposé (RWF)','Bank deposit reference':'Référence du dépôt bancaire',
     'Notes (optional)':'Notes (facultatif)','Attach bank-slip photo':'Joindre une photo du reçu bancaire','Change bank-slip photo':'Modifier la photo du reçu bancaire',
     'Submit end-of-day settlement':'Envoyer le rapport de dépôt','Recent settlement reports':'Rapports de dépôt récents','No settlement reports submitted yet.':'Aucun rapport de dépôt envoyé.',
     'Assigned replenishments':'Réapprovisionnements attribués','How tasks work':'Comment fonctionnent les missions','1. Go on duty and allow GPS so operations can see your position.':'1. Prenez votre service et autorisez le GPS pour partager votre position avec l’équipe.','2. Operations assigns a nearby agent and sends the transfer instructions here.':'2. L’équipe vous affecte un agent proche et envoie les consignes ici.','3. Open the route, contact the agent if needed, then enter the amount delivered and complete the task.':'3. Ouvrez l’itinéraire, contactez l’agent si besoin, puis saisissez le montant remis et terminez la mission.','Enter only the amount actually delivered to the agent’s POS float. Completing this task automatically adds that amount to the agent’s available float. The amount and updated POS balance appear in the admin system immediately.':'Saisissez uniquement le montant réellement remis sur le POS de l’agent. En terminant la mission, ce montant est ajouté à son solde et apparaît immédiatement dans le système administrateur.','Tasks refresh automatically every 20 seconds. Use Refresh tasks to check now.':'Les missions s’actualisent automatiquement toutes les 20 secondes. Appuyez sur Actualiser les missions pour vérifier maintenant.','Refreshing tasks…':'Actualisation des missions…','Operations inbox':'Boîte de réception de l’équipe','No direct messages yet. Send a message to operations if you need help.':'Aucun message. Écrivez à l’équipe si vous avez besoin d’aide.','Message operations directly':'Écrire directement à l’équipe',
@@ -284,7 +284,7 @@ const roleCopy = {
     'Live location is shared with operations.':'Votre position est partagée avec l’équipe.',
     'Stay on duty so operations can find you and assign a nearby agent.':'Restez en service pour que l’équipe puisse vous trouver et vous affecter à un agent proche.',
     'New replenishment assigned for {agent}.':'Nouvelle mission de réapprovisionnement pour {agent}.',
-    'Current float':'Fonds actuels','Float added (£)':'Montant ajouté au POS (£)','Amount replenished':'Montant réapprovisionné','Open navigation':'Ouvrir la navigation','Complete top-up':'Terminer le réapprovisionnement','Recording top-up…':'Enregistrement du réapprovisionnement…','Top-up recorded:':'Réapprovisionnement enregistré :','Agent POS float now:':'Solde POS actuel de l’agent :',
+    'Current float':'Fonds actuels','Float added (RWF)':'Montant ajouté au POS (RWF)','Amount replenished':'Montant réapprovisionné','Open navigation':'Ouvrir la navigation','Complete top-up':'Terminer le réapprovisionnement','Recording top-up…':'Enregistrement du réapprovisionnement…','Top-up recorded:':'Réapprovisionnement enregistré :','Agent POS float now:':'Solde POS actuel de l’agent :',
     'EN ROUTE':'EN ROUTE','ASSIGNED':'ATTRIBUÉ','Agent needing float':'Agent ayant besoin de fonds','London':'Londres',
     'Status':'Statut','offline':'hors service','Tap & Go · London network':'Tap & Go · Réseau de Londres',
     'used':'utilisés','deposited':'déposés','Admin':'Administrateur','pending':'en attente','approved':'approuvé','rejected':'rejeté',
@@ -1215,9 +1215,9 @@ export default function App() {
           <View style={styles.panel}>
             <Text style={styles.cardTitle}>{translate(commuterLanguage, 'How to sell a ticket')}</Text>
             <Text style={styles.cardSub}>{translate(commuterLanguage, 'Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.')}</Text>
-            <Text style={styles.help}>{translate(commuterLanguage, 'Example: £10 float − £2 ticket = £8 remaining. A sale above your available float is rejected.')}</Text>
+            <Text style={styles.help}>{translate(commuterLanguage, 'Example: RWF 10,000 float − RWF 2,000 ticket = RWF 8,000 remaining. A sale above your available float is rejected.')}</Text>
           </View>
-          <Input label={translate(commuterLanguage, 'Commuter ticket sale (£)')} value={saleAmount} onChangeText={setSaleAmount}
+          <Input label={translate(commuterLanguage, 'Commuter ticket sale (RWF)')} value={saleAmount} onChangeText={setSaleAmount}
             placeholder={translate(commuterLanguage, 'Amount paid from float')} keyboardType="decimal-pad"/>
           <ActionButton secondary onPress={recordTicketSale} disabled={ticketSaleBusy}>
             {translate(commuterLanguage, ticketSaleBusy ? 'Recording sale…' : 'Record ticket sale')}
@@ -1230,7 +1230,7 @@ export default function App() {
           <View style={styles.panel}>
             <Text style={styles.cardTitle}>{translate(commuterLanguage, 'End-of-day bank settlement')}</Text>
             <Text style={styles.help}>{translate(commuterLanguage, 'Enter the bank-slip details and attach a photo. Reported float use is calculated from recorded ticket sales. Your balance will not change until an administrator verifies the slip and approves a float credit.')}</Text>
-            <Input label={translate(commuterLanguage, 'Amount deposited (£)')} value={depositAmount} onChangeText={setDepositAmount}
+            <Input label={translate(commuterLanguage, 'Amount deposited (RWF)')} value={depositAmount} onChangeText={setDepositAmount}
               placeholder={translate(commuterLanguage, 'Amount shown on the bank slip')} keyboardType="decimal-pad"/>
             <Input label={translate(commuterLanguage, 'Bank deposit reference')} value={bankReference} onChangeText={setBankReference}
               placeholder={translate(commuterLanguage, 'Reference printed on the slip')} maxLength={100}/>
@@ -1651,7 +1651,7 @@ function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, on
         <Text style={styles.sendButtonText}>{translate(language, sending ? 'Sending…' : 'Send reply')}</Text>
       </TouchableOpacity>
     </View>
-    <Input label={translate(language, 'Float added (£)')} value={amount} onChangeText={setAmount} placeholder={translate(language, 'Amount replenished')} keyboardType="decimal-pad"/>
+    <Input label={translate(language, 'Float added (RWF)')} value={amount} onChangeText={setAmount} placeholder={translate(language, 'Amount replenished')} keyboardType="decimal-pad"/>
     <Text style={styles.help}>{translate(language, 'Enter only the amount actually delivered to the agent’s POS float. Completing this task automatically adds that amount to the agent’s available float. The amount and updated POS balance appear in the admin system immediately.')}</Text>
     <View style={styles.actionRow}>
       <View style={styles.actionFlex}><ActionButton secondary onPress={onNavigate}>{translate(language, 'Open navigation')}</ActionButton></View>
