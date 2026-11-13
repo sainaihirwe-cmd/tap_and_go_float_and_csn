@@ -1266,31 +1266,27 @@ export default function App() {
             <Text style={styles.cardSub} numberOfLines={1}>{account.email}</Text>
           </View>
           <View style={styles.accountActions}>
-            <TouchableOpacity accessibilityRole="button" onPress={() => setProfileOpen(value => !value)} style={styles.accountAction}>
-              <Text style={styles.settingsText}>{translate(commuterLanguage, profileOpen ? 'Close settings' : 'Settings')}</Text>
-            </TouchableOpacity>
             <TouchableOpacity accessibilityRole="button" onPress={signOut} style={styles.accountAction}>
               <Text style={styles.signOut}>{translate(commuterLanguage, 'Sign out')}</Text>
             </TouchableOpacity>
           </View>
         </View>
-        {profileOpen && <ProfileEditor role={role} profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
-        {!profileOpen && <View style={styles.staffTabs}>
+        <View style={styles.staffTabs}>
           {(role === 'superagent' ? [['home', 'Home'], ['messages', 'Admin chat'], ['requests', 'Deletion requests']] : [['home', 'Home'], ['messages', 'Messages']]).map(([key, label]) =>
             <TouchableOpacity key={key} accessibilityRole="button" accessibilityState={{ selected: staffTab === key }}
               onPress={() => setStaffTab(key)} style={[styles.staffTab, staffTab === key && styles.staffTabActive]}>
               <Text style={[styles.staffTabText, staffTab === key && styles.staffTabTextActive]}>{translate(commuterLanguage, label)}</Text>
             </TouchableOpacity>
           )}
-        </View>}
+        </View>
 
-        {role === 'superagent' && !profileOpen && <SuperagentDashboard
+        {role === 'superagent' && <SuperagentDashboard
           language={commuterLanguage}
           activeTab={staffTab}
           onMessage={flash}
         />}
 
-        {role === 'agent' && !profileOpen && staffTab === 'home' && <>
+        {role === 'agent' && staffTab === 'home' && <>
           <View style={styles.balancePanel}>
             <Text style={styles.panelEyebrow}>{translate(commuterLanguage, 'AVAILABLE DIGITAL FLOAT')}</Text>
             <Text style={styles.bigBalance}>{currency(Number(floatBalance))}</Text>
@@ -1342,7 +1338,7 @@ export default function App() {
           </View>
         </>}
 
-        {role === 'agent' && !profileOpen && staffTab === 'messages' && <>
+        {role === 'agent' && staffTab === 'messages' && <>
           <DistributorInboxPanel
             language={commuterLanguage}
             messages={inboxMessages}
@@ -1365,7 +1361,7 @@ export default function App() {
           </View>
         </>}
 
-        {role === 'distributor' && !profileOpen && staffTab === 'home' && <>
+        {role === 'distributor' && staffTab === 'home' && <>
           <View style={styles.distributorHero}>
             <Text style={styles.heroEyebrow}>{translate(commuterLanguage, 'Field dashboard')}</Text>
             <Text style={styles.heroTitle}>{profile?.name || translate(commuterLanguage, 'Distributor')}</Text>
@@ -1402,7 +1398,7 @@ export default function App() {
               <Text style={styles.cardSub}>{translate(commuterLanguage, 'Stay on duty so operations can find you and assign a nearby agent.')}</Text></View>}
         </>}
 
-        {role === 'distributor' && !profileOpen && staffTab === 'messages' && <DistributorInboxPanel
+        {role === 'distributor' && staffTab === 'messages' && <DistributorInboxPanel
           language={commuterLanguage}
           messages={inboxMessages}
           draft={inboxDraft}

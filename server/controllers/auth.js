@@ -154,6 +154,9 @@ app.patch('/api/auth/mobile/profile', async (req, res, next) => {
   if (!mobileSession || !['agent', 'distributor', 'superagent', 'commuter'].includes(mobileSession.role)) {
     return res.status(401).json({ error: 'Sign in with an active mobile account to continue.' });
   }
+  if (mobileSession.role !== 'commuter') {
+    return res.status(403).json({ error: 'Staff account details can only be changed by an administrator.' });
+  }
   return requireMobile(mobileSession.role)(req, res, next);
 }, async (req, res) => {
   const session = await mongoose.startSession();
