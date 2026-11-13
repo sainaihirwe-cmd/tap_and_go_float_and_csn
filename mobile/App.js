@@ -1631,7 +1631,7 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
 
   async function requestDeletion(agent) {
     const text = reason.trim();
-    if (!text || requestingId) return;
+    if (!text || saving || String(requestingId) !== String(agent._id)) return;
     try {
       setSaving(true);
       setError('');
