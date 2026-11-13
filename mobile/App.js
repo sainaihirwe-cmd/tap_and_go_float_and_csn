@@ -1176,7 +1176,13 @@ export default function App() {
     <StatusBar barStyle="dark-content" backgroundColor="#f4f7f3"/>
     <View style={styles.header}>
       <View><Text style={styles.brand}>tap<Text style={styles.brandAccent}>&go</Text></Text><Text style={styles.kicker}>{role === 'commuter' ? commuter.header : translate(commuterLanguage, 'NETWORK SUPPORT')}</Text></View>
-      <View style={styles.live}><View style={styles.liveDot}/><Text style={styles.liveText}>{role === 'commuter' ? commuter.live : translate(commuterLanguage, 'LIVE')}</Text></View>
+      <View style={styles.headerActions}>
+        <View style={styles.live}><View style={styles.liveDot}/><Text style={styles.liveText}>{role === 'commuter' ? commuter.live : translate(commuterLanguage, 'LIVE')}</Text></View>
+        {account&&<AccountControl account={account} profile={profile} role={account.role} language={commuterLanguage}
+          expanded={accountMenuOpen} onToggle={() => setAccountMenuOpen(value => !value)}
+          onSettings={() => {setAccountMenuOpen(false);setProfileOpen(value => !value)}}
+          onSignOut={() => {setAccountMenuOpen(false);signOut()}}/>}
+      </View>
     </View>
     {role === 'commuter' && <View style={styles.languageControls}>
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: languagePickerOpen }}
@@ -1241,13 +1247,6 @@ export default function App() {
 
       {role === 'commuter' && <>
         {account?.role === 'commuter' && <>
-        <View style={styles.accountBar}>
-          <View style={styles.flex}><Text style={styles.cardTitle}>{profile?.name}</Text><Text style={styles.cardSub}>{account.email}</Text></View>
-          <AccountControl account={account} profile={profile} role="commuter" language={commuterLanguage}
-            expanded={accountMenuOpen} onToggle={() => setAccountMenuOpen(value => !value)}
-            onSettings={() => {setAccountMenuOpen(false);setProfileOpen(value => !value)}}
-            onSignOut={() => {setAccountMenuOpen(false);signOut()}}/>
-        </View>
         {profileOpen && <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
         </>}
         {account?.role === 'commuter' && !profileOpen && <>
@@ -1300,16 +1299,6 @@ export default function App() {
       </View>}
 
       {role !== 'commuter' && account?.role === role && <>
-        <View style={styles.accountBar}>
-          <View style={styles.accountIdentity}>
-            <Text style={styles.cardTitle} numberOfLines={1}>{profile?.name}</Text>
-            <Text style={styles.cardSub} numberOfLines={1}>{account.email}</Text>
-          </View>
-          <AccountControl account={account} profile={profile} role={role} language={commuterLanguage}
-            expanded={accountMenuOpen} onToggle={() => setAccountMenuOpen(value => !value)}
-            onSettings={() => {setAccountMenuOpen(false);setProfileOpen(value => !value)}}
-            onSignOut={() => {setAccountMenuOpen(false);signOut()}}/>
-        </View>
         <View style={styles.staffTabs}>
           {(role === 'superagent' ? [['home', 'Home'], ['messages', 'Admin chat'], ['requests', 'Deletion requests']] : [['home', 'Home'], ['messages', 'Messages']]).map(([key, label]) =>
             <TouchableOpacity key={key} accessibilityRole="button" accessibilityState={{ selected: staffTab === key }}
@@ -1967,7 +1956,8 @@ function DistributorInboxPanel({ language, messages, draft, onDraftChange, onSen
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f4f7f3' }, loading: { flex: 1 },
-  header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 10, elevation: 10 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   brand: { fontSize: 20, fontWeight: '800', color: '#202923' }, brandAccent: { color: '#368461' },
   kicker: { fontSize: 8, fontWeight: '700', letterSpacing: 1.4, color: '#909b91' },
   live: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#edf6ef', borderRadius: 20, padding: 8 },
@@ -2042,7 +2032,7 @@ const styles = StyleSheet.create({
   legendLine: { fontSize: 10, color: '#657168', lineHeight: 15 },
   accountBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 10, borderRadius: 9, marginTop: 10, gap: 9 },
   accountControlWrap: { position: 'relative', zIndex: 5 },
-  accountMenu: { position: 'absolute', top: 44, right: 0, width: 260, maxWidth: 300, backgroundColor: 'white', borderWidth: 1, borderColor: '#dfe7df', borderRadius: 10, padding: 12, elevation: 8, shadowColor: '#1e3324', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
+  accountMenu: { position: 'absolute', zIndex: 20, top: 44, right: 0, width: 260, maxWidth: 300, backgroundColor: 'white', borderWidth: 1, borderColor: '#dfe7df', borderRadius: 10, padding: 12, elevation: 12, shadowColor: '#1e3324', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
   accountMenuHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#edf0ed' },
   accountMenuTitle: { color: '#253129', fontSize: 12, fontWeight: '800' },
   accountMenuRole: { color: '#287a5e', backgroundColor: '#edf6ef', borderRadius: 12, paddingVertical: 4, paddingHorizontal: 7, fontSize: 9, fontWeight: '700' },
