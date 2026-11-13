@@ -591,24 +591,32 @@ app.patch('/api/dispatches/:id', async (req, res) => {
     const allowed = ['en_route', 'completed', 'cancelled'];
     if (!allowed.includes(req.body.status)) return res.status(400).json({ error: `status must be one of: ${allowed.join(', ')}.` });
     if(req.body.status==='completed'&&(!Number.isFinite(req.body.amountAdded)||req.body.amountAdded<=0||Math.round(req.body.amountAdded*100)/100!==req.body.amountAdded))return res.status(400).json({error:'Enter a positive replenishment amount with no more than two decimal places.'});
+    const salesCollected = req.body.salesCollected === undefined ? 0 : req.body.salesCollected;
+    if (req.body.status === 'completed' && (!Number.isFinite(salesCollected) || salesCollected < 0 || Math.round(salesCollected * 100) / 100 !== salesCollected)) {
+      return res.status(400).json({ error: 'Enter collected ticket sales as a non-negative amount with no more than two decimal places.' });
+    }
     let result;
     await session.withTransaction(async()=>{
       const dispatch=await Dispatch.findById(req.params.id).session(session);
       if(!dispatch){const error=new Error('Dispatch not found.');error.status=404;throw error}
       if(String(dispatch.distributor)!==String(req.mobile.account.distributor)){const error=new Error('This dispatch is assigned to another distributor.');error.status=403;throw error}
       if(!['assigned','en_route'].includes(dispatch.status)){const error=new Error('Dispatch is no longer active.');error.status=409;throw error}
-      dispatch.status=req.body.status;if(req.body.status==='completed'){dispatch.completedAt=new Date();dispatch.amountAdded=req.body.amountAdded}await dispatch.save({session});
+      dispatch.status=req.body.status;if(req.body.status==='completed'){dispatch.completedAt=new Date();dispatch.salesCollected=salesCollected;dispatch.amountAdded=req.body.amountAdded}await dispatch.save({session});
       if(['completed','cancelled'].includes(req.body.status)){
         const distributor=await Distributor.findById(dispatch.distributor).session(session);
         if(distributor){distributor.status='available';distributor.duty_state='active';distributor.assigned_tasks.pull(dispatch._id);await distributor.save({session})}
         if(req.body.status==='completed'){
           const agent=await Agent.findById(dispatch.agent).session(session);
           if(!agent){const error=new Error('Agent for this dispatch no longer exists.');error.status=409;throw error}
-          const previous=agent.floatBalance;if(!Number.isFinite(agent.floatReference)||agent.floatReference<=0)agent.floatReference=previous;agent.floatBalance+=req.body.amountAdded;agent.current_float=agent.floatBalance;agent.floatReference+=req.body.amountAdded;agent.status=agent.floatBalance<=lowFloatThreshold(agent)?'at_risk':'active';agent.lastSeenAt=new Date();agent.last_updated=agent.lastSeenAt;await agent.save({session});
+          const previous=agent.floatBalance;
+          if (salesCollected > previous) { const error=new Error('Collected ticket sales cannot exceed the agent POS float.');error.status=409;throw error; }
+          if(!Number.isFinite(agent.floatReference)||agent.floatReference<=0)agent.floatReference=previous;
+          agent.floatBalance=previous-salesCollected+req.body.amountAdded;agent.current_float=agent.floatBalance;agent.floatReference+=req.body.amountAdded;agent.status=agent.floatBalance<=lowFloatThreshold(agent)?'at_risk':'active';agent.lastSeenAt=new Date();agent.last_updated=agent.lastSeenAt;await agent.save({session});
           dispatch.floatBalanceAfter=agent.floatBalance;await dispatch.save({session});
+          if (salesCollected > 0) await Transaction.create([{agent:agent._id,amount:salesCollected,kind:'ticket_sale',location:agent.location}],{session});
           await Transaction.create([{agent:agent._id,amount:req.body.amountAdded,kind:'float_top_up',location:agent.location}],{session});
           await Alert.findByIdAndUpdate(dispatch.alert,{$set:{state:'resolved',resolvedAt:new Date(),resolved_status:true}},{session});
-          await OperationalEvent.create([{event_id:crypto.randomUUID(),action_type:'replenish',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id),agentId:String(agent._id),amount_added:req.body.amountAdded,previous_float:previous}},{event_id:crypto.randomUUID(),action_type:'dispatch_completed',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id)}}],{session});
+          await OperationalEvent.create([{event_id:crypto.randomUUID(),action_type:'replenish',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id),agentId:String(agent._id),amount_added:req.body.amountAdded,sales_collected:salesCollected,previous_float:previous}},{event_id:crypto.randomUUID(),action_type:'dispatch_completed',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id)}}],{session});
         }
       }
       result=await dispatch.populate([{path:'agent',select:'name place zone location floatBalance'},{path:'distributor',select:'name location'}]);

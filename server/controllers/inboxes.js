@@ -1,5 +1,78 @@
 module.exports = (context) => {
-  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
+  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, AgentAdminInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
+
+app.get('/api/admin/agent-inbox', async (_req, res) => {
+  try {
+    const [accounts, inboxes] = await Promise.all([
+      MobileAccount.find({ role: 'agent', active: true })
+        .select('agent email').populate('agent', 'name agent_id place zone phone archivedAt').lean(),
+      AgentAdminInbox.find().sort({ updatedAt: -1 }).lean()
+    ]);
+    const inboxByAgent = new Map(inboxes.map(inbox => [String(inbox.agent), inbox]));
+    res.json(accounts
+      .filter(account => account.agent && !account.agent.archivedAt)
+      .map(account => {
+        const inbox = inboxByAgent.get(String(account.agent._id));
+        return {
+          agent: account.agent,
+          email: account.email,
+          messages: inbox?.messages || [],
+          updatedAt: inbox?.updatedAt || null
+        };
+      })
+      .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0)));
+  } catch (error) { apiError(res, error); }
+});
+
+app.post('/api/admin/agent-inbox/:agentId/messages', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters.' });
+    if (!mongoose.isValidObjectId(req.params.agentId)) return res.status(404).json({ error: 'Agent not found.' });
+    const [agent, account] = await Promise.all([
+      Agent.findOne({ _id: req.params.agentId, archivedAt: null }).select('name').lean(),
+      MobileAccount.findOne({ role: 'agent', agent: req.params.agentId, active: true }).select('_id')
+    ]);
+    if (!agent || !account) return res.status(404).json({ error: 'An active agent login was not found.' });
+    const message = { sender: 'admin', senderName: req.admin.name || 'Operations', text, sentAt: new Date() };
+    const inbox = await AgentAdminInbox.findOneAndUpdate(
+      { agent: req.params.agentId },
+      { $push: { messages: { $each: [message], $slice: -200 } } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    ).select('messages updatedAt');
+    const event = { agentId: req.params.agentId, message };
+    io.to(`mobile:${account._id}`).emit('agent:admin-inbox-message', event);
+    broadcast('agent:admin-inbox-message', event);
+    res.status(201).json({ message, updatedAt: inbox.updatedAt });
+  } catch (error) { apiError(res, error); }
+});
+
+app.get('/api/agents/:id/admin-inbox', async (req, res) => {
+  try {
+    const agent = await Agent.findOne(mobileEntityQuery(req, req.params.id, 'agent_id')).select('_id').lean();
+    if (!agent) return res.status(404).json({ error: 'Agent not found.' });
+    const inbox = await AgentAdminInbox.findOne({ agent: agent._id }).select('messages updatedAt').lean();
+    res.json(inbox || { messages: [], updatedAt: null });
+  } catch (error) { apiError(res, error); }
+});
+
+app.post('/api/agents/:id/admin-inbox', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters.' });
+    const agent = await Agent.findOne(mobileEntityQuery(req, req.params.id, 'agent_id')).select('_id name').lean();
+    if (!agent) return res.status(404).json({ error: 'Agent not found.' });
+    const message = { sender: 'agent', senderName: agent.name, text, sentAt: new Date() };
+    const inbox = await AgentAdminInbox.findOneAndUpdate(
+      { agent: agent._id },
+      { $push: { messages: { $each: [message], $slice: -200 } } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    ).select('messages updatedAt');
+    const event = { agentId: String(agent._id), message };
+    broadcast('agent:admin-inbox-message', event);
+    res.status(201).json({ message, updatedAt: inbox.updatedAt });
+  } catch (error) { apiError(res, error); }
+});
 
 app.get('/api/distributor-inbox', async (req, res) => {
   try {

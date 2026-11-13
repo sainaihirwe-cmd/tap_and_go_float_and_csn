@@ -14,7 +14,7 @@ const { createServerConfig } = require('./config/serverConfig');
 const { validPoint, mobileProfileUpdates, publicIdQuery } = require('./utils/validation');
 const createAuthHelpers = require('./utils/auth');
 const { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation } = require('./utils/email');
-const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models/index');
+const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, AgentAdminInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models/index');
 const { adminEmail, adminPassword, authSecret, allowedOrigins } = createServerConfig(process.env);
 
 if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.AUTH_SECRET)) {
@@ -68,7 +68,7 @@ async function notifyAssignedDistributor(dispatch) {
 const routeDependencies = {
   app, io, mongoose, crypto, axios, getRoute,
   Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent,
-  AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox,
+  AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, AgentAdminInbox,
   SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret,
   allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload,
   validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor,
@@ -102,7 +102,7 @@ app.use('/api', (req, res, next) => {
   if (req.method === 'GET' && /^\/distributors\/[^/]+\/tasks$/.test(p)) return requireMobile('distributor')(req, res, next);
   if ((req.method === 'GET' || req.method === 'POST') && p === '/distributor-inbox') return requireMobile('distributor')(req, res, next);
   if (p.startsWith('/superagent/')) return requireMobile('superagent')(req, res, next);
-  if ((req.method === 'GET' || req.method === 'POST') && /^\/agents\/[^/]+\/superagent-inbox$/.test(p)) return requireMobile('agent')(req, res, next);
+  if ((req.method === 'GET' || req.method === 'POST') && /^\/agents\/[^/]+\/(superagent-inbox|admin-inbox)$/.test(p)) return requireMobile('agent')(req, res, next);
   if (req.method === 'GET' && p === '/agents') {
     const match = (req.headers.authorization || '').match(/^Bearer\s+(\S+)$/);
     const session = match && verifySignedToken(match[1]);

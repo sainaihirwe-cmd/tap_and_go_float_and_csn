@@ -75,6 +75,7 @@ const dispatchSchema = new mongoose.Schema({
   routeDurationSeconds: { type: Number, default: null },
   routeSource: { type: String, enum: ['road','geodesic'], default: 'geodesic' },
   assignedAt: { type: Date, default: Date.now },
+  salesCollected: { type: Number, min: 0, default: 0 },
   amountAdded: { type: Number, min: 0, default: null },
   floatBalanceAfter: { type: Number, min: 0, default: null },
   completedAt: Date

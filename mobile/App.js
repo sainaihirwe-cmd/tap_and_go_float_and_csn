@@ -453,9 +453,9 @@ export default function App() {
   const [nearbySearched, setNearbySearched] = useState(false);
   const [location, setLocation] = useState(null);
   const [floatBalance, setFloatBalance] = useState('');
-  const [saleAmount, setSaleAmount] = useState('');
-  const [ticketSaleBusy, setTicketSaleBusy] = useState(false);
-  const ticketSaleInProgress = useRef(false);
+  const [adminAgentInboxMessages, setAdminAgentInboxMessages] = useState([]);
+  const [adminAgentInboxDraft, setAdminAgentInboxDraft] = useState('');
+  const [adminAgentInboxSending, setAdminAgentInboxSending] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
   const [supportBusy, setSupportBusy] = useState(false);
   const supportRequestInProgress = useRef(false);
@@ -597,6 +597,33 @@ export default function App() {
     }
   }, [account?.role, profileId, commuterLanguage]);
 
+  const loadAgentAdminInbox = useCallback(async () => {
+    if (account?.role !== 'agent' || !profileId) return;
+    try {
+      const inbox = await api(`/api/agents/${encodeURIComponent(profileId)}/admin-inbox`);
+      setAdminAgentInboxMessages(inbox.messages || []);
+    } catch (problem) {
+      flash(translate(commuterLanguage, problem.message));
+    }
+  }, [account?.role, profileId, commuterLanguage]);
+
+  async function sendAgentAdminMessage() {
+    const text = adminAgentInboxDraft.trim();
+    if (!text || adminAgentInboxSending) return;
+    setAdminAgentInboxSending(true);
+    try {
+      const result = await api(`/api/agents/${encodeURIComponent(profileId)}/admin-inbox`, {
+        method: 'POST', body: JSON.stringify({ text })
+      });
+      setAdminAgentInboxMessages(current => [...current.filter(item => item.sentAt !== result.message.sentAt), result.message].slice(-200));
+      setAdminAgentInboxDraft('');
+    } catch (problem) {
+      flash(translate(commuterLanguage, problem.message));
+    } finally {
+      setAdminAgentInboxSending(false);
+    }
+  }
+
   async function sendInboxMessage() {
     const text = inboxDraft.trim();
     if (!text || inboxSendInProgress.current) return;
@@ -639,9 +666,13 @@ export default function App() {
   useEffect(() => {
     if (account?.role !== 'agent') return undefined;
     loadAgentSuperagentInbox();
-    const timer = setInterval(loadAgentSuperagentInbox, 20000);
+    loadAgentAdminInbox();
+    const timer = setInterval(() => {
+      loadAgentSuperagentInbox();
+      loadAgentAdminInbox();
+    }, 20000);
     return () => clearInterval(timer);
-  }, [account?.role, loadAgentSuperagentInbox]);
+  }, [account?.role, loadAgentSuperagentInbox, loadAgentAdminInbox]);
 
   useEffect(() => {
     if (account?.role !== 'agent') return undefined;
@@ -657,6 +688,11 @@ export default function App() {
         if (event.message?.sender === 'superagent') {
           flash(`${translate(commuterLanguage, 'New message from your Superagent.')} ${event.message.text}`);
         }
+      });
+      socket.on('agent:admin-inbox-message', event => {
+        if (event.agentId !== String(profileId)) return;
+        setAdminAgentInboxMessages(current => [...current.filter(item => item.sentAt !== event.message.sentAt), event.message].slice(-200));
+        if (event.message?.sender === 'admin') flash(`${translate(commuterLanguage, 'New message from operations.')} ${event.message.text}`);
       });
     }).catch(problem => console.warn('Unable to connect for Superagent messages:', problem.message));
     return () => {
@@ -981,35 +1017,6 @@ export default function App() {
     }
   }
 
-  async function recordTicketSale() {
-    if (ticketSaleInProgress.current) return;
-    ticketSaleInProgress.current = true;
-    try {
-      setTicketSaleBusy(true);
-      const amount = Number(saleAmount);
-      if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter a positive ticket-sale amount.');
-      const current = await locate();
-      const result = await api(`/api/agents/${encodeURIComponent(profileId)}/ticket-sales`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount,
-          location: { type: 'Point', coordinates: [current.coords.longitude, current.coords.latitude] }
-        })
-      });
-      setFloatBalance(String(result.agent.floatBalance));
-      setAccount(value => ({ ...value, entity: result.agent }));
-      setSaleAmount('');
-      flash(translate(commuterLanguage, result.sos?.triggered
-        ? 'Ticket sale recorded. Your float is low; operations has been alerted.'
-        : 'Ticket sale recorded and float balance updated.'));
-    } catch (problem) {
-      flash(translate(commuterLanguage, problem.message));
-    } finally {
-      ticketSaleInProgress.current = false;
-      setTicketSaleBusy(false);
-    }
-  }
-
   async function requestFloatSupport() {
     if (supportRequestInProgress.current) return;
     supportRequestInProgress.current = true;
@@ -1089,14 +1096,16 @@ export default function App() {
     }
   }
 
-  async function finishTask(task, amountAdded) {
+  async function finishTask(task, salesCollected, amountAdded) {
     try {
       const amount = Number(amountAdded);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter a positive replenishment amount.');
+      const collected = Number(salesCollected || 0);
+      if (!Number.isFinite(collected) || collected < 0) throw new Error('Enter a valid collected-sales amount.');
       const completed = await api(`/api/dispatches/${task._id}`, {
-        method: 'PATCH', body: JSON.stringify({ status: 'completed', amountAdded: amount })
+        method: 'PATCH', body: JSON.stringify({ status: 'completed', salesCollected: collected, amountAdded: amount })
       });
-      flash(`${translate(commuterLanguage, 'Replenishment recorded and task completed.')} ${translate(commuterLanguage, 'Top-up recorded:')} ${currency(amount)} · ${translate(commuterLanguage, 'Agent POS float now:')} ${currency(completed.agent?.floatBalance)}`);
+      flash(`${translate(commuterLanguage, 'Replenishment recorded and task completed.')} ${translate(commuterLanguage, 'Sales collected:')} ${currency(collected)} · ${translate(commuterLanguage, 'Top-up recorded:')} ${currency(amount)} · ${translate(commuterLanguage, 'Agent POS float now:')} ${currency(completed.agent?.floatBalance)}`);
       loadTasks();
       return true;
     } catch (problem) {
@@ -1297,16 +1306,9 @@ export default function App() {
             <Text style={styles.help}>{translate(commuterLanguage, 'Low float is reported to operations automatically when a sale is recorded. Open Messages to explain a problem or request an urgent top-up.')}</Text>
           </View>}
           <View style={styles.panel}>
-            <Text style={styles.cardTitle}>{translate(commuterLanguage, 'How to sell a ticket')}</Text>
-            <Text style={styles.cardSub}>{translate(commuterLanguage, 'Enter the ticket amount and tap Record ticket sale. That amount is automatically deducted from your available float and the balance updates.')}</Text>
-            <Text style={styles.help}>{translate(commuterLanguage, 'Example: RWF 10,000 float − RWF 2,000 ticket = RWF 8,000 remaining. A sale above your available float is rejected.')}</Text>
+            <Text style={styles.cardTitle}>{translate(commuterLanguage, 'Ticket sales and float collection')}</Text>
+            <Text style={styles.cardSub}>{translate(commuterLanguage, 'Distributors record ticket sales collected and replacement float delivered when completing an approved replenishment. Your POS balance updates from those verified amounts.')}</Text>
           </View>
-          <Input label={translate(commuterLanguage, 'Commuter ticket sale (RWF)')} value={saleAmount} onChangeText={setSaleAmount}
-            placeholder={translate(commuterLanguage, 'Amount paid from float')} keyboardType="decimal-pad"/>
-          <ActionButton secondary onPress={recordTicketSale} disabled={ticketSaleBusy}>
-            {translate(commuterLanguage, ticketSaleBusy ? 'Recording sale…' : 'Record ticket sale')}
-          </ActionButton>
-          <Text style={styles.help}>{translate(commuterLanguage, 'Recording a sale deducts it from your available float and helps operations see how much service each agent provides to commuters.')}</Text>
           <ActionButton secondary onPress={toggleTracking}>
             {translate(commuterLanguage, tracking ? 'Stop background location' : 'Enable background SOS monitoring')}
           </ActionButton>
@@ -1339,6 +1341,18 @@ export default function App() {
         </>}
 
         {role === 'agent' && staffTab === 'messages' && <>
+          <DistributorInboxPanel
+            language={commuterLanguage}
+            messages={adminAgentInboxMessages}
+            draft={adminAgentInboxDraft}
+            onDraftChange={setAdminAgentInboxDraft}
+            onSend={sendAgentAdminMessage}
+            sending={adminAgentInboxSending}
+            ownSender="agent"
+            title="Chat with operations"
+            emptyText="No messages with operations yet."
+            placeholder="Message operations"
+          />
           <DistributorInboxPanel
             language={commuterLanguage}
             messages={inboxMessages}
@@ -1393,7 +1407,7 @@ export default function App() {
             language={commuterLanguage} onNavigate={() => navigateToAgent(task.agent)}
             onCall={() => task.agent?.phone && Linking.openURL(`tel:${encodeURIComponent(task.agent.phone)}`)}
             onSendMessage={text => sendTaskMessage(task, text)}
-            onComplete={amount => finishTask(task, amount)}/>) :
+            onComplete={(salesCollected, amountAdded) => finishTask(task, salesCollected, amountAdded)}/>) :
             <View style={styles.empty}><Text style={styles.cardTitle}>{translate(commuterLanguage, 'No active assignments')}</Text>
               <Text style={styles.cardSub}>{translate(commuterLanguage, 'Stay on duty so operations can find you and assign a nearby agent.')}</Text></View>}
         </>}
@@ -1841,15 +1855,19 @@ function ProfileEditor({ role, profile, email: accountEmail, language, onSaved }
 }
 
 function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, onComplete }) {
-  const [amount, setAmount] = useState('');
+  const [salesCollected, setSalesCollected] = useState('');
+  const [amountAdded, setAmountAdded] = useState('');
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [completing, setCompleting] = useState(false);
   async function completeTopUp() {
-    if (!amount.trim() || completing) return;
+    if (!amountAdded.trim() || completing) return;
     setCompleting(true);
     try {
-      if (await onComplete(amount)) setAmount('');
+      if (await onComplete(salesCollected, amountAdded)) {
+        setSalesCollected('');
+        setAmountAdded('');
+      }
     } finally {
       setCompleting(false);
     }
@@ -1883,13 +1901,14 @@ function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, on
         <Text style={styles.sendButtonText}>{translate(language, sending ? 'Sending…' : 'Send reply')}</Text>
       </TouchableOpacity>
     </View>
-    <Input label={translate(language, 'Float added (RWF)')} value={amount} onChangeText={setAmount} placeholder={translate(language, 'Amount replenished')} keyboardType="decimal-pad"/>
-    <Text style={styles.help}>{translate(language, 'Enter only the amount actually delivered to the agent’s POS float. Completing this task automatically adds that amount to the agent’s available float. The amount and updated POS balance appear in the admin system immediately.')}</Text>
+    <Input label={translate(language, 'Ticket sales collected (RWF)')} value={salesCollected} onChangeText={setSalesCollected} placeholder={translate(language, 'Amount collected from sales')} keyboardType="decimal-pad"/>
+    <Input label={translate(language, 'Replacement float delivered (RWF)')} value={amountAdded} onChangeText={setAmountAdded} placeholder={translate(language, 'Amount replenished')} keyboardType="decimal-pad"/>
+    <Text style={styles.help}>{translate(language, 'Enter collected ticket sales and replacement float separately. Sales reduce agent POS float; only replacement float actually delivered is credited. Completing the task records both amounts and updates the POS once.')}</Text>
     <View style={styles.actionRow}>
       <View style={styles.actionFlex}><ActionButton secondary onPress={onNavigate}>{translate(language, 'Open navigation')}</ActionButton></View>
       {task.agent?.phone ? <View style={styles.actionFlex}><ActionButton secondary onPress={onCall}>{translate(language, 'Call agent')}</ActionButton></View> : null}
     </View>
-    <ActionButton onPress={completeTopUp} disabled={!amount.trim() || completing}>{translate(language, completing ? 'Recording top-up…' : 'Complete top-up')}</ActionButton>
+    <ActionButton onPress={completeTopUp} disabled={!amountAdded.trim() || completing}>{translate(language, completing ? 'Recording top-up…' : 'Complete top-up')}</ActionButton>
   </View>;
 }
 

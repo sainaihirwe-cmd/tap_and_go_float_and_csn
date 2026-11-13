@@ -35,8 +35,20 @@ const agentSuperagentInboxSchema = new mongoose.Schema({
 }, { timestamps: true });
 agentSuperagentInboxSchema.index({ agent: 1, superagent: 1 }, { unique: true });
 
+const agentAdminInboxMessageSchema = new mongoose.Schema({
+  sender: { type: String, enum: ['admin', 'agent'], required: true },
+  senderName: { type: String, required: true, trim: true, maxlength: 80 },
+  text: { type: String, required: true, trim: true, maxlength: 500 },
+  sentAt: { type: Date, default: Date.now }
+}, { _id: false });
+const agentAdminInboxSchema = new mongoose.Schema({
+  agent: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', required: true, unique: true },
+  messages: { type: [agentAdminInboxMessageSchema], default: [] }
+}, { timestamps: true });
+
 module.exports = {
   DistributorInbox: mongoose.model('DistributorInbox', distributorInboxSchema, 'distributor_inboxes'),
   SuperagentInbox: mongoose.model('SuperagentInbox', superagentInboxSchema, 'superagent_inboxes'),
-  AgentSuperagentInbox: mongoose.model('AgentSuperagentInbox', agentSuperagentInboxSchema, 'agent_superagent_inboxes')
+  AgentSuperagentInbox: mongoose.model('AgentSuperagentInbox', agentSuperagentInboxSchema, 'agent_superagent_inboxes'),
+  AgentAdminInbox: mongoose.model('AgentAdminInbox', agentAdminInboxSchema, 'agent_admin_inboxes')
 };
