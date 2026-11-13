@@ -1,5 +1,14 @@
 module.exports = (context) => {
   const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
+  function haversineMeters([lon1, lat1], [lon2, lat2]) {
+    const radians = value => value * Math.PI / 180;
+    const latitudeDelta = radians(lat2 - lat1);
+    const longitudeDelta = radians(lon2 - lon1);
+    const distance = Math.sin(latitudeDelta / 2) ** 2 +
+      Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(longitudeDelta / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(distance), Math.sqrt(1 - distance));
+  }
+
 app.get('/api/agents', async (req, res) => {
   try {
     const query = req.query.includeArchived === 'true' ? {} : { archivedAt: null };
@@ -69,7 +78,8 @@ app.get('/api/admin/commuter-map/stats', async (_req, res) => {
 
 app.get('/api/commuter/nearby', async (req, res) => {
   try {
-    const longitude=Number(req.query.longitude),latitude=Number(req.query.latitude),radius=Math.max(100,Math.min(Number(req.query.radius)||5000,50000));
+    const isCommuter = req.mobile?.role === 'commuter' || req.mobile?.account.role === 'commuter';
+    const longitude=Number(req.query.longitude),latitude=Number(req.query.latitude),radius=Math.max(100,Math.min(Number(req.query.radius)||(isCommuter?500:5000),isCommuter?500:50000));
     const center={type:'Point',coordinates:[longitude,latitude]};
     if(!Number.isFinite(longitude)||!Number.isFinite(latitude)||!validPoint(center))return res.status(400).json({error:'Valid longitude and latitude are required.'});
     const activeSince = new Date(Date.now() - 15 * 60 * 1000);
@@ -90,8 +100,11 @@ app.get('/api/commuter/nearby', async (req, res) => {
       sessionId, center, radiusMeters: radius, activeWindowMinutes: 15, count,
       agents: agents.map(agent => {
         const { floatBalance, floatReference, safeThreshold, ...publicAgent } = agent;
-        const threshold = Math.max(Number(safeThreshold) || Number(process.env.SOS_THRESHOLD_GBP || 40), 10000, (Number(floatReference) || 0) * 0.1);
-        const liquidityLevel = floatBalance <= threshold ? 'low' : floatBalance <= threshold * 2 ? 'medium' : 'high';
+        const threshold = Math.max(
+          Number(safeThreshold) || Number(process.env.SOS_THRESHOLD_GBP || 40),
+          10000,
+          (Number(floatReference) || 0) * 0.1
+        );
         return {
           _id: publicAgent._id,
           name: publicAgent.name,
@@ -99,7 +112,11 @@ app.get('/api/commuter/nearby', async (req, res) => {
           zone: publicAgent.zone,
           location: publicAgent.location,
           lastSeenAt: publicAgent.lastSeenAt,
-          liquidityLevel,
+          ...(isCommuter
+            ? { floatBalance }
+            : {
+              liquidityLevel: floatBalance <= threshold ? 'low' : floatBalance <= threshold * 2 ? 'medium' : 'high'
+            }),
           distanceMeters: haversineMeters(center.coordinates, agent.location.coordinates)
         };
       })

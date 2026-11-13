@@ -59,7 +59,7 @@ function createAuthHelpers(context) {
           ? await Agent.exists({ _id: account.agent, archivedAt: null })
           : await Distributor.exists({ _id: account.distributor, archivedAt: null }));
         if (!profileExists) return res.status(401).json({ error: 'This profile is archived. Contact your administrator.' });
-        req.mobile = { account, session };
+        req.mobile = { account, session, role };
         next();
       } catch (error) { apiError(res, error); }
     };
@@ -125,19 +125,20 @@ function createAuthHelpers(context) {
   }
 
   async function mobileAccountView(account) {
-    const entity = account.role === 'commuter'
+    const role = account.role || (account.constructor?.modelName === 'CommuterAccount' ? 'commuter' : undefined);
+    const entity = role === 'commuter'
       ? { name: account.name }
-      : account.role === 'agent'
+      : role === 'agent'
         ? await Agent.findById(account.agent).select('name phone place zone location floatBalance floatReference safeThreshold liquidityStatus status agent_id shiftStartedAt shiftSeconds').lean()
-        : account.role === 'distributor'
+        : role === 'distributor'
           ? await Distributor.findById(account.distributor).select('name phone place location status distributor_id').lean()
           : { name: account.name };
     if (!entity) throw Object.assign(new Error('The mobile account is no longer linked to a profile.'), { status: 401 });
     return {
       id: String(account._id),
       email: account.email,
-      role: account.role,
-      entity: account.role === 'agent' ? { ...entity, lowFloatThreshold: lowFloatThreshold(entity) } : entity
+      role,
+      entity: role === 'agent' ? { ...entity, lowFloatThreshold: lowFloatThreshold(entity) } : entity
     };
   }
 

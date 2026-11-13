@@ -543,7 +543,7 @@ function AdminCommuterMap(){
    const center={latitude:position.coords.latitude,longitude:position.coords.longitude};
    try{
     const query=new URLSearchParams({latitude:String(center.latitude),longitude:String(center.longitude),radius:'500'});
-    const response=await fetch(`/api/commuter/nearby?${query}`);
+    const response=await apiFetch(`/api/commuter/nearby?${query}`);
     const result=await responseData(response,'Nearby agent search');
     if(!response.ok)throw Error(result.error||'Unable to search for nearby agents.');
     setLocation(center);setAgents(result.agents||[]);setCount(result.count||0);setSelectedId(result.agents?.[0]?._id||null);setSearchedAt(new Date());

@@ -218,6 +218,7 @@ superagentDeletionRequestSchema.index(
 superagentDeletionRequestSchema.index({ superagent: 1, createdAt: -1 });
 
 const commuterAccountSchema = new mongoose.Schema({
+  role: { type: String, enum: ['commuter'], default: 'commuter', immutable: true },
   name: { type: String, required: true, trim: true, maxlength: 80 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
   passwordHash: { type: String, required: true, select: false },

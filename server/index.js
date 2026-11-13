@@ -79,10 +79,17 @@ require('./routes/auth')(routeDependencies);
 require('./routes/admin')(routeDependencies);
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', now: new Date().toISOString() }));
 
-// Only commuter discovery is public; device data is scoped to an authenticated mobile account.
+// Device data is scoped to a matching mobile account; admin routes use the admin session.
 app.use('/api', (req, res, next) => {
   const p = req.path;
-  if (p === '/health' || p === '/commuter/nearby' || p === '/auth/mobile/login') return next();
+  if (p === '/health' || p === '/auth/mobile/login') return next();
+  if (p === '/commuter/nearby') {
+    const match = (req.headers.authorization || '').match(/^Bearer\s+(\S+)$/);
+    const session = match && verifySignedToken(match[1]);
+    return session?.role === 'commuter'
+      ? requireMobile('commuter')(req, res, next)
+      : requireAdmin(req, res, next);
+  }
   if (p === '/auth/mobile/me' || p === '/auth/mobile/logout') {
     const match = (req.headers.authorization || '').match(/^Bearer\s+(\S+)$/);
     const session = match && verifySignedToken(match[1]);

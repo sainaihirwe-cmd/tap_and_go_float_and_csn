@@ -36,16 +36,10 @@ const commuterCopy = {
     active: 'Active now', away: 'away', directions: 'Get directions →',
     agentsFound: count => `${count} active agent${count === 1 ? '' : 's'} found within 500 m`,
     showingNearest: count => `Showing the ${count} nearest agents.`,
-    availability: 'Float availability',
-    legend: 'What the float colors mean',
-    high: 'Green · High', highMeaning: 'Above twice the safe-float threshold; usually ready to serve.',
-    medium: 'Yellow · Medium', mediumMeaning: 'Above the safe threshold, but getting lower; consider another agent if convenient.',
-    low: 'Red · Low', lowMeaning: 'At or below the safe threshold; the agent may be unable to complete a top-up.',
-    colorNote: 'Colors show an availability band only, not the agent’s exact float balance. Tap an agent for directions.',
     searchResult: count => `${count} active agents within 500 m.`,
     locationDenied: 'Allow location access to find nearby agents.',
     locationError: 'Could not find your location. Check location services and try again.',
-    markerActive: 'Active', float: 'float', levelHigh: 'high', levelMedium: 'medium', levelLow: 'low',
+    float: 'float',
     distanceUnavailable: 'Distance unavailable', radius: '500 m'
   },
   rw: {
@@ -61,16 +55,10 @@ const commuterCopy = {
     active: 'Arakora ubu', away: 'kuva aha', directions: 'Reba inzira →',
     agentsFound: count => `Abakozi bakora babonetse muri metero 500: ${count}`,
     showingNearest: count => `Hagaragajwe abakozi ${count} bakwegereye kurusha abandi.`,
-    availability: 'Amafaranga yo kugurisha asigaye',
-    legend: 'Ibisobanuro by’amabara y’amafaranga yo kugurisha',
-    high: 'Icyatsi · Menshi', highMeaning: 'Ari hejuru yikubye kabiri igipimo fatizo; ashobora kuba yiteguye kugufasha.',
-    medium: 'Umuhondo · Hagati', mediumMeaning: 'Ari hejuru y’igipimo fatizo ariko agenda agabanuka; ushobora kugerageza undi mukozi.',
-    low: 'Umutuku · Make', lowMeaning: 'Ari ku gipimo fatizo cyangwa munsi yacyo; ashobora kutabasha kukugurishiriza.',
-    colorNote: 'Amabara agaragaza urwego gusa, ntabwo agaragaza amafaranga nyayo. Kanda ku mukozi urebe inzira.',
     searchResult: count => `Abakozi bakora babonetse muri metero 500: ${count}.`,
     locationDenied: 'Emera ko porogaramu ikoresha aho uri kugira ngo ibone abakozi bakwegereye.',
     locationError: 'Ntitwabashije kubona aho uri. Reba niba GPS ifunguye wongere ugerageze.',
-    markerActive: 'Arakora', float: 'amafaranga yo kugurisha', levelHigh: 'menshi', levelMedium: 'ari hagati', levelLow: 'make',
+    float: 'amafaranga yo kugurisha',
     distanceUnavailable: 'Intera ntizwi', radius: 'metero 500'
   },
   fr: {
@@ -86,16 +74,10 @@ const commuterCopy = {
     active: 'Actif maintenant', away: 'd’ici', directions: 'Itinéraire →',
     agentsFound: count => `${count} agent${count === 1 ? '' : 's'} actif${count === 1 ? '' : 's'} trouvé${count === 1 ? '' : 's'} dans un rayon de 500 m`,
     showingNearest: count => `Affichage des ${count} agents les plus proches.`,
-    availability: 'Disponibilité des fonds',
-    legend: 'Signification des couleurs des fonds',
-    high: 'Vert · Élevé', highMeaning: 'Supérieur à deux fois le seuil de sécurité ; l’agent est généralement prêt à vous servir.',
-    medium: 'Jaune · Moyen', mediumMeaning: 'Au-dessus du seuil de sécurité, mais en baisse ; vous pouvez choisir un autre agent.',
-    low: 'Rouge · Faible', lowMeaning: 'Au niveau du seuil de sécurité ou en dessous ; l’agent pourrait ne pas pouvoir effectuer la recharge.',
-    colorNote: 'Les couleurs indiquent une plage de disponibilité, pas le montant exact des fonds. Appuyez sur un agent pour obtenir l’itinéraire.',
     searchResult: count => `${count} agent(s) actif(s) dans un rayon de 500 m.`,
     locationDenied: 'Autorisez l’accès à votre position pour trouver des agents à proximité.',
     locationError: 'Impossible de déterminer votre position. Vérifiez la localisation et réessayez.',
-    markerActive: 'Actif', float: 'fonds', levelHigh: 'élevés', levelMedium: 'moyens', levelLow: 'faibles',
+    float: 'fonds',
     distanceUnavailable: 'Distance indisponible', radius: '500 m'
   }
 };
@@ -103,12 +85,11 @@ const roleCopy = {
   en: {
     'guide': 'Tap below and allow location access to find active agents within {radius}. Choose an agent for directions.',
     'Create a commuter account':'Create a commuter account','Sign in to your commuter account':'Sign in to your commuter account',
-    'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.':'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.',
+    'Create a commuter account to view nearby active agents on the map. Agent and distributor accounts are created by an administrator.':'Create a commuter account to view nearby active agents on the map. Agent and distributor accounts are created by an administrator.',
     'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.':'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.',
     'Full name':'Full name','At least 12 characters':'At least 12 characters','Create account & open map':'Create account & open map',
     'Please wait…':'Please wait…','Already have an account? Sign in':'Already have an account? Sign in','New commuter? Create an account':'New commuter? Create an account',
     'Agent, Distributor or Superagent sign in':'Agent, Distributor or Superagent sign in','Back to commuter account':'Back to commuter account',
-    'Create or sign in to a commuter account':'Create or sign in to a commuter account','Back to nearby agents':'Back to nearby agents',
     'Home':'Home','Messages':'Messages','Settings':'Settings','Close settings':'Close settings','Messages & support':'Messages & support',
     'Superagent network':'Superagent network','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Manage only the agents assigned to you. POS accounts remain administrator-managed.',
     'Your assigned agents':'Your assigned agents','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.',
@@ -151,7 +132,7 @@ const roleCopy = {
   rw: {
     'NETWORK SUPPORT':'UBUFASHA BW’URUSOBE','LIVE':'BIRI GUKORA','Agent':'Umukozi','Distributor':'Utanga amafaranga',
     'Create a commuter account':'Fungura konti y’umugenzi','Sign in to your commuter account':'Injira muri konti y’umugenzi',
-    'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.':'Ushobora gufungura konti yo kubika imyirondoro yawe. Ushobora gushaka abakozi bakwegereye utinjiye muri konti. Konti z’abakozi n’abatanga amafaranga zitangwa n’umuyobozi.',
+    'Create a commuter account to view nearby active agents on the map. Agent and distributor accounts are created by an administrator.':'Fungura konti y’umugenzi kugira ngo urebe abakozi bakora bakwegereye ku ikarita. Konti z’abakozi n’abatanga amafaranga zitangwa n’umuyobozi.',
     'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.':'Abakozi n’abatanga amafaranga ntibifungurira konti; umuyobozi ni we ubaha amakuru yo kwinjira.',
     'Full name':'Amazina yose','At least 12 characters':'Inyuguti nibura 12','Create account & open map':'Fungura konti urebe ikarita',
     'Please wait…':'Tegereza…','Already have an account? Sign in':'Usanzwe ufite konti? Injira','New commuter? Create an account':'Uri umugenzi mushya? Fungura konti',
@@ -164,7 +145,6 @@ const roleCopy = {
     'Sign in to your Agent account':'Injira muri konti yawe y’umukozi','Sign in to your Distributor account':'Injira muri konti yawe y’utanga amafaranga','Accounts are created by your network administrator. Contact them if you need access.':'Konti itangwa n’umuyobozi w’urusobe. Muvugishe niba ukeneye ubufasha.',
     'Email':'Imeyili','Password':'Ijambo ry’ibanga','Your password':'Ijambo ry’ibanga ryawe','Sign in':'Injira','Signing in…':'Urimo kwinjira…',
     'Agent, Distributor or Superagent sign in':'Kwinjira kw’umukozi, utanga amafaranga cyangwa superagent','Back to commuter account':'Subira kuri konti y’umugenzi',
-    'Create or sign in to a commuter account':'Fungura konti y’umugenzi cyangwa winjire','Back to nearby agents':'Subira ku bakozi bakwegereye',
     'Home':'Ahabanza','Messages':'Ubutumwa','Settings':'Igenamiterere','Close settings':'Funga igenamiterere','Messages & support':'Ubutumwa n’ubufasha',
     'Superagent network':'Urusobe rwa superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Ushobora gucunga abakozi bahawe konti yawe gusa. Umuyobozi ni we ucunga konti za POS.',
     'Your assigned agents':'Abakozi wagenewe','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'Ushobora gucunga abakozi wagenewe gusa. Amafaranga yabo ya POS agaragara hano. Umuyobozi ni we ufungura konti zabo.',
@@ -247,7 +227,7 @@ const roleCopy = {
   fr: {
     'NETWORK SUPPORT':'ASSISTANCE RÉSEAU','LIVE':'EN DIRECT','Commuter':'Voyageur','Agent':'Agent','Distributor':'Distributeur',
     'Create a commuter account':'Créer un compte voyageur','Sign in to your commuter account':'Se connecter au compte voyageur',
-    'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.':'Créez un compte facultatif pour enregistrer votre profil voyageur. Vous pouvez rechercher des agents à proximité sans vous connecter. Les comptes agent et distributeur sont créés par un administrateur.',
+    'Create a commuter account to view nearby active agents on the map. Agent and distributor accounts are created by an administrator.':'Créez un compte voyageur pour afficher sur la carte les agents actifs à proximité. Les comptes agent et distributeur sont créés par un administrateur.',
     'Agent and distributor accounts cannot self-register; sign-in details are issued by an administrator.':'Les agents et distributeurs ne peuvent pas créer leur compte ; l’administrateur fournit leurs identifiants.',
     'Full name':'Nom complet','At least 12 characters':'12 caractères minimum','Create account & open map':'Créer un compte et afficher la carte',
     'Please wait…':'Veuillez patienter…','Already have an account? Sign in':'Vous avez déjà un compte ? Connectez-vous','New commuter? Create an account':'Nouveau voyageur ? Créez un compte',
@@ -260,7 +240,6 @@ const roleCopy = {
     'Sign in to your Agent account':'Connectez-vous à votre compte agent','Sign in to your Distributor account':'Connectez-vous à votre compte distributeur','Accounts are created by your network administrator. Contact them if you need access.':'Votre compte est créé par l’administrateur du réseau. Contactez-le pour obtenir de l’aide.',
     'Email':'E-mail','Password':'Mot de passe','Your password':'Votre mot de passe','Sign in':'Se connecter','Signing in…':'Connexion…',
     'Agent, Distributor or Superagent sign in':'Connexion agent, distributeur ou Superagent','Back to commuter account':'Retour au compte voyageur',
-    'Create or sign in to a commuter account':'Créer un compte voyageur ou se connecter','Back to nearby agents':'Retour aux agents à proximité',
     'Home':'Accueil','Messages':'Messages','Settings':'Paramètres','Close settings':'Fermer les paramètres','Messages & support':'Messages et assistance',
     'Superagent network':'Réseau Superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Gérez uniquement les agents qui vous sont attribués. Les comptes POS restent gérés par l’administrateur.',
     'Your assigned agents':'Vos agents attribués','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'Vous gérez uniquement les agents attribués à votre compte. Leur solde POS apparaît ici. Seul un administrateur peut créer leurs accès.',
@@ -351,7 +330,7 @@ async function api(path, options = {}) {
   const isFormData = typeof FormData !== 'undefined' && request.body instanceof FormData;
   const isAuthenticationRequest = /^\/api\/auth\/(?:mobile\/login|commuter\/(?:login|register))$/.test(path);
   const controller = isAuthenticationRequest ? new AbortController() : null;
-  const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), 90000) : null;
   let response;
   try {
     response = await fetch(`${API}${path}`, {
@@ -364,7 +343,7 @@ async function api(path, options = {}) {
       }
     });
   } catch (problem) {
-    if (problem.name === 'AbortError') throw new Error('Sign-in timed out. Check the server connection and try again.');
+    if (problem.name === 'AbortError') throw new Error('The server took too long to respond. Please try again when your connection is stable.');
     throw new Error(`Cannot reach the Tap & Go server at ${API}. Check your internet connection. For local development, set EXPO_PUBLIC_API_URL to your computer's LAN address. ${problem.message}`);
   } finally {
     if (timeout) clearTimeout(timeout);
@@ -445,7 +424,7 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [commuterName, setCommuterName] = useState('');
-  const [commuterAuthOpen, setCommuterAuthOpen] = useState(false);
+  const [commuterAuthOpen, setCommuterAuthOpen] = useState(true);
   const [commuterAuthMode, setCommuterAuthMode] = useState('register');
   const [staffLoginOpen, setStaffLoginOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
@@ -520,7 +499,7 @@ export default function App() {
       setAccount(null);
       setRole('commuter');
       setCommuterAuthOpen(true);
-      setStaffLoginOpen(true);
+      setStaffLoginOpen(false);
       setProfileOpen(false);
       setTasks([]);
       setNearby([]);
@@ -541,6 +520,10 @@ export default function App() {
           if (active) {
             setAccount(value);
             setRole(value.role);
+            if (value.role === 'commuter') {
+              setCommuterAuthOpen(false);
+              setStaffLoginOpen(false);
+            }
             setFloatBalance(String(value.entity.floatBalance ?? 0));
           }
         }
@@ -721,6 +704,7 @@ export default function App() {
       setAccount(value);
       setRole(value.role);
       setCommuterAuthOpen(false);
+      setStaffLoginOpen(false);
       if (value.entity.floatBalance !== undefined) setFloatBalance(String(value.entity.floatBalance));
       setPassword('');
       setLoginError('');
@@ -789,7 +773,7 @@ export default function App() {
       commuterMapLoaded.current = '';
       setRole('commuter');
       setProfileOpen(false);
-      setCommuterAuthOpen(false);
+      setCommuterAuthOpen(true);
       setStaffTab('home');
       setStaffLoginOpen(false);
       setCommuterAuthMode('register');
@@ -806,7 +790,7 @@ export default function App() {
       setLoading(true);
       const current = await locate();
       const sessionId = account?.role === 'commuter' ? `&sessionId=${encodeURIComponent(account.id)}` : '';
-      const result = await api(`/api/commuter/nearby?longitude=${current.coords.longitude}&latitude=${current.coords.latitude}&radius=500${sessionId}`, { token: '' });
+      const result = await api(`/api/commuter/nearby?longitude=${current.coords.longitude}&latitude=${current.coords.latitude}&radius=500${sessionId}`);
       setNearby(result.agents);
       setNearbyCount(Number.isInteger(result.count) ? result.count : result.agents.length);
       setNearbySearched(true);
@@ -1048,8 +1032,13 @@ export default function App() {
     return <SafeAreaView style={styles.safe}><ActivityIndicator style={styles.loading} color="#287a5e"/></SafeAreaView>;
   }
 
-  const screenTitle = role === 'commuter' ? commuter.title : translate(commuterLanguage,
-    role === 'agent' ? 'Agent float' : role === 'distributor' ? 'Distributor tasks' : 'Superagent network');
+  const screenTitle = role === 'commuter'
+    ? commuterAuthOpen && !account
+      ? translate(commuterLanguage, staffLoginOpen
+        ? 'Agent, Distributor or Superagent sign in'
+        : commuterAuthMode === 'register' ? 'Create a commuter account' : 'Sign in to your commuter account')
+      : commuter.title
+    : translate(commuterLanguage, role === 'agent' ? 'Agent float' : role === 'distributor' ? 'Distributor tasks' : 'Superagent network');
   return <SafeAreaView style={styles.safe}>
     <StatusBar barStyle="dark-content" backgroundColor="#f4f7f3"/>
     <View style={styles.header}>
@@ -1089,7 +1078,7 @@ export default function App() {
 
       {role === 'commuter' && commuterAuthOpen && !account && !staffLoginOpen && <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{translate(commuterLanguage, commuterAuthMode === 'register' ? 'Create a commuter account' : 'Sign in to your commuter account')}</Text>
-        <Text style={styles.help}>{translate(commuterLanguage, 'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.')}</Text>
+        <Text style={styles.help}>{translate(commuterLanguage, 'Create a commuter account to view nearby active agents on the map. Agent and distributor accounts are created by an administrator.')}</Text>
         {commuterAuthMode === 'register' && <Input label={translate(commuterLanguage, 'Full name')} value={commuterName} onChangeText={setCommuterName} placeholder={translate(commuterLanguage, 'Your name')} autoCapitalize="words" maxLength={80}/>}
         <Input label={translate(commuterLanguage, 'Email')} value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
         <Input label={translate(commuterLanguage, 'Password')} value={password} onChangeText={setPassword} placeholder={translate(commuterLanguage, 'At least 12 characters')} secureTextEntry maxLength={1024}/>
@@ -1103,9 +1092,6 @@ export default function App() {
         <TouchableOpacity accessibilityRole="button" onPress={() => { setStaffLoginOpen(true); setLoginError(''); }} style={styles.authSwitch}>
           <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Agent, Distributor or Superagent sign in')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={() => { setCommuterAuthOpen(false); setLoginError(''); }} style={styles.authSwitch}>
-          <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Back to nearby agents')}</Text>
-        </TouchableOpacity>
       </View>}
 
       {role === 'commuter' && commuterAuthOpen && !account && staffLoginOpen && <View style={styles.panel}>
@@ -1118,21 +1104,9 @@ export default function App() {
         <TouchableOpacity accessibilityRole="button" onPress={() => { setStaffLoginOpen(false); setLoginError(''); }} style={styles.authSwitch}>
           <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Back to commuter account')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" onPress={() => { setCommuterAuthOpen(false); setStaffLoginOpen(false); setLoginError(''); }} style={styles.authSwitch}>
-          <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Back to nearby agents')}</Text>
-        </TouchableOpacity>
       </View>}
 
       {role === 'commuter' && <>
-        {!account && !commuterAuthOpen && <View style={styles.panel}>
-          <Text style={styles.cardTitle}>{translate(commuterLanguage, 'Create an optional account to save your commuter profile. You can search nearby agents without signing in. Agent and distributor access is created by an administrator.')}</Text>
-          <ActionButton secondary onPress={() => { setCommuterAuthOpen(true); setStaffLoginOpen(false); }}>
-            {translate(commuterLanguage, 'Create or sign in to a commuter account')}
-          </ActionButton>
-          <TouchableOpacity accessibilityRole="button" onPress={() => { setCommuterAuthOpen(true); setStaffLoginOpen(true); setLoginError(''); }} style={styles.authSwitch}>
-            <Text style={styles.authSwitchText}>{translate(commuterLanguage, 'Agent, Distributor or Superagent sign in')}</Text>
-          </TouchableOpacity>
-        </View>}
         {account?.role === 'commuter' && <>
         <View style={styles.accountBar}>
           <View style={styles.flex}><Text style={styles.cardTitle}>{profile?.name}</Text><Text style={styles.cardSub}>{account.email}</Text></View>
@@ -1147,19 +1121,17 @@ export default function App() {
         </View>
         {profileOpen && <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
         </>}
-        {(!account || account.role === 'commuter') && !profileOpen && !commuterAuthOpen && <>
+        {account?.role === 'commuter' && !profileOpen && <>
         <View style={styles.mapCard}>
           <MapView provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined} style={styles.map}
             initialRegion={london}
             region={location ? { ...location, latitudeDelta: 0.008, longitudeDelta: 0.008 } : undefined}
             showsUserLocation={Boolean(location)}>
             {nearby.map(agent => {
-              const level = floatLevel(agent);
               return <Marker key={agent._id}
-                pinColor={level === 'high' ? '#368461' : level === 'medium' ? '#e2a72e' : '#d9534f'}
                 coordinate={{ latitude: agent.location.coordinates[1], longitude: agent.location.coordinates[0] }}
                 title={agent.name}
-                description={`${agent.place || agent.zone || commuter.agentFallback} · ${commuter.markerActive} · ${commuter[`level${level[0].toUpperCase()}${level.slice(1)}`]} ${commuter.float}`}/>;
+                description={`${agent.place || agent.zone || commuter.agentFallback} · ${currency(agent.floatBalance)} ${commuter.float}`}/>;
             })}
           </MapView>
         </View>
@@ -1181,21 +1153,14 @@ export default function App() {
         </View>}
         {nearby.map(agent => {
           return <TouchableOpacity key={agent._id} accessibilityRole="button"
-          accessibilityLabel={`${agent.name || commuter.agentFallback}, ${formatAgentDistance(agent.distanceMeters, commuterLanguage)} ${commuter.away}`}
+          accessibilityLabel={`${agent.name || commuter.agentFallback}, ${currency(agent.floatBalance)} ${commuter.float}, ${formatAgentDistance(agent.distanceMeters, commuterLanguage)} ${commuter.away}`}
           onPress={() => navigateToAgent(agent)} style={[styles.card, styles.agentResultCard]}>
           <View style={styles.flex}><Text style={styles.cardTitle}>{agent.name}</Text>
             <Text style={styles.cardSub}>{agent.place || agent.zone || commuter.agentFallback} · {commuter.active}</Text>
             <Text style={styles.cardSub}>{formatAgentDistance(agent.distanceMeters, commuterLanguage)} {commuter.away}</Text></View>
-          <View style={styles.alignRight}><Text style={styles.cardSub}>{commuter.directions}</Text></View>
+          <View style={styles.alignRight}><Text style={styles.amount}>{currency(agent.floatBalance)}</Text><Text style={styles.cardSub}>{commuter.directions}</Text></View>
         </TouchableOpacity>;
         })}
-        <View style={styles.legend}>
-          <Text style={styles.cardTitle}>{commuter.availability}</Text>
-          <Text style={styles.legendLine}><Text style={styles.highText}>{commuter.high}</Text> — {commuter.highMeaning}</Text>
-          <Text style={styles.legendLine}><Text style={styles.mediumText}>{commuter.medium}</Text> — {commuter.mediumMeaning}</Text>
-          <Text style={styles.legendLine}><Text style={styles.lowText}>{commuter.low}</Text> — {commuter.lowMeaning}</Text>
-          <Text style={styles.help}>{commuter.colorNote}</Text>
-        </View>
         </>}
       </>}
 
@@ -1349,29 +1314,10 @@ export default function App() {
   </SafeAreaView>;
 }
 
-function floatLevel(agent) {
-  if (['high', 'medium', 'low'].includes(agent?.liquidityLevel)) return agent.liquidityLevel;
-  const balance = Number(agent?.floatBalance ?? agent?.current_float ?? 0);
-  const threshold = Math.max(Number(agent?.safeThreshold) || 40, 10000, Number(agent?.floatReference || 0) * 0.1);
-  return balance <= threshold ? 'low' : balance <= threshold * 2 ? 'medium' : 'high';
-}
-
 function formatAgentDistance(distanceMeters, language = 'en') {
   const distance = Number(distanceMeters);
   if (!Number.isFinite(distance) || distance < 0) return commuterCopy[language]?.distanceUnavailable || commuterCopy.en.distanceUnavailable;
   return distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1000).toFixed(1)} km`;
-}
-
-function FloatBadge({ agent, language = 'en' }) {
-  const level = floatLevel(agent);
-  const label = language === 'rw'
-    ? ({ high: 'Amafaranga menshi', medium: 'Amafaranga ari hagati', low: 'Amafaranga make' })[level]
-    : language === 'fr'
-      ? ({ high: 'FONDS ÉLEVÉS', medium: 'FONDS MOYENS', low: 'FONDS FAIBLES' })[level]
-      : `${level.toUpperCase()} FLOAT`;
-  return <View style={[styles.floatBadge, styles[`floatBadge_${level}`]]}>
-    <Text style={[styles.floatBadgeText, styles[`${level}Text`]]}>{label}</Text>
-  </View>;
 }
 
 function SuperagentDashboard({ language, activeTab, onMessage }) {
@@ -1807,11 +1753,6 @@ const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'white', borderColor: '#e8ede7', borderWidth: 1, borderRadius: 9, padding: 10, marginBottom: 6 },
   flex: { flex: 1 }, alignRight: { alignItems: 'flex-end' }, cardTitle: { fontSize: 12, fontWeight: '700', color: '#253129' },
   cardSub: { fontSize: 10, color: '#89938b', marginTop: 3 }, amount: { fontSize: 12, fontWeight: '800', color: '#397a56' },
-  floatBadge: { borderRadius: 16, paddingHorizontal: 9, paddingVertical: 5 },
-  floatBadge_high: { backgroundColor: '#eaf5ee' }, floatBadge_medium: { backgroundColor: '#fff5dd' },
-  floatBadge_low: { backgroundColor: '#fff0ed' }, highText: { color: '#287a5e', fontWeight: '700' },
-  mediumText: { color: '#a87600', fontWeight: '700' }, lowText: { color: '#c44d45', fontWeight: '700' },
-  floatBadgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 0.4 },
   slipButton: { minHeight: 44, marginTop: 10, padding: 7, borderRadius: 8, borderWidth: 1, borderColor: '#dce6dc', backgroundColor: '#f8faf7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   slipButtonText: { color: '#397a56', fontSize: 11, fontWeight: '700' },
   slipPreview: { width: 36, height: 36, borderRadius: 5 },
