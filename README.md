@@ -118,6 +118,7 @@ Commuters create an account in the mobile app and then see the live agent map ce
 | GET | `/api/superagent/agent-inboxes` | List separate private conversations with the Superagent's assigned agents |
 | GET | `/api/superagent/float-requests` | List float-support alerts from the Superagent's assigned agents, separate from direct chat |
 | POST | `/api/superagent/agents/:agentId/inbox` | Reply in a private conversation with an assigned agent |
+| DELETE | `/api/superagent/agents/:id` | Submit an administrator-reviewed archive request for an assigned agent; financial history is retained |
 | GET | `/api/dispatch-options?agentId=…` or `?alertId=…` | Find available distributors within 500 m, preferring the agent's zone and ranking by route ETA |
 | POST | `/api/alerts/:id/dispatch` | Assign a selected or best-matched available distributor; optional `instructions` are sent with the task |
 | POST | `/api/admin/agents/:id/dispatch` | Create or reuse an agent support alert and assign a selected or best-matched distributor |

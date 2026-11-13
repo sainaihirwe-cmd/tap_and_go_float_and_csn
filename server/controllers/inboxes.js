@@ -307,7 +307,7 @@ app.get('/api/superagent/deletion-requests', async (req, res) => {
   } catch (error) { apiError(res, error); }
 });
 
-app.post('/api/superagent/agents/:id/deletion-requests', async (req, res) => {
+async function requestAgentDeletion(req, res) {
   try {
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
     if (!reason || reason.length > 500) return res.status(400).json({ error: 'Give a reason between 1 and 500 characters.' });
@@ -331,7 +331,10 @@ app.post('/api/superagent/agents/:id/deletion-requests', async (req, res) => {
     if (error.code === 11000) return res.status(409).json({ error: 'A deletion request for this agent is already pending.' });
     apiError(res, error);
   }
-});
+}
+
+app.post('/api/superagent/agents/:id/deletion-requests', requestAgentDeletion);
+app.delete('/api/superagent/agents/:id', requestAgentDeletion);
 
 app.get('/api/admin/superagent-deletion-requests', requireAdmin, async (_req, res) => {
   try {

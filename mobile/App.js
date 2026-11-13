@@ -1599,7 +1599,7 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
       setSaving(true);
       setError('');
       const request = await api(`/api/superagent/agents/${encodeURIComponent(agent._id)}/deletion-requests`, {
-        method: 'POST',
+        method: 'DELETE',
         body: JSON.stringify({ reason: text })
       });
       setRequests(current => [request, ...current.filter(item => item._id !== request._id)]);
