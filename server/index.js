@@ -13,6 +13,7 @@ const {getRoute}=require('./routing');
 const { createServerConfig } = require('./config/serverConfig');
 const { validPoint, mobileProfileUpdates, publicIdQuery } = require('./utils/validation');
 const createAuthHelpers = require('./utils/auth');
+const { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation } = require('./utils/email');
 const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models');
 const { adminEmail, adminPassword, authSecret, allowedOrigins } = createServerConfig(process.env);
 
@@ -73,7 +74,8 @@ const routeDependencies = {
   validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor,
   issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery,
   sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash,
-  mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError
+  mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError,
+  createInvitationToken, ensureInvitationConfigured, sendStaffInvitation
 };
 require('./routes/auth')(routeDependencies);
 require('./routes/admin')(routeDependencies);

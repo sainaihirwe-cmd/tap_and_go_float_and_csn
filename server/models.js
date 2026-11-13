@@ -189,11 +189,15 @@ const mobileAccountSchema = new mongoose.Schema({
   managedAgents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Agent' }],
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
   passwordHash: { type: String, required: true, select: false },
+  inviteTokenHash: { type: String, select: false },
+  inviteExpiresAt: { type: Date },
+  setupPending: { type: Boolean, default: false },
   sessionVersion: { type: Number, default: 0 },
   active: { type: Boolean, default: true }
 }, { timestamps: true });
 mobileAccountSchema.index({ agent: 1 }, { unique: true, sparse: true });
 mobileAccountSchema.index({ distributor: 1 }, { unique: true, sparse: true });
+mobileAccountSchema.index({ inviteTokenHash: 1 }, { unique: true, sparse: true });
 mobileAccountSchema.pre('validate', function validateRoleAccount(next) {
   if ((this.role === 'agent' && (!this.agent || this.distributor)) ||
       (this.role === 'distributor' && (!this.distributor || this.agent)) ||

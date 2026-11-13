@@ -310,7 +310,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
   </div>
 }
 
-function App(){
+function DashboardApp(){
  const [session,setSession]=useState(undefined);const [sessionNotice,setSessionNotice]=useState('');
  useEffect(()=>{
   let mounted=true;
@@ -344,6 +344,33 @@ function App(){
  return session?<Dashboard admin={session} onLogout={logout} onProfileSaved={updateSession}/>:<LoginScreen onLogin={login} notice={sessionNotice}/>;
 }
 
+function App(){
+ const setupToken=new URLSearchParams(window.location.hash.slice(1)).get('setupToken');
+ return setupToken?<AccountSetupScreen token={setupToken}/>:<DashboardApp/>;
+}
+
+function AccountSetupScreen({token}){
+ const [password,setPassword]=useState('');
+ const [confirmPassword,setConfirmPassword]=useState('');
+ const [error,setError]=useState('');
+ const [busy,setBusy]=useState(false);
+ const [complete,setComplete]=useState(false);
+ const submit=async event=>{
+  event.preventDefault();setError('');
+  if(password!==confirmPassword){setError('Passwords do not match.');return}
+  setBusy(true);
+  try{
+   const response=await fetch(apiUrl('/api/auth/mobile/activate'),{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,password})});
+   const data=await responseData(response,'Account setup');
+   if(!response.ok)throw Error(data.error||'Unable to set up your account.');
+   setComplete(true);setPassword('');setConfirmPassword('');
+   window.history.replaceState({},'',window.location.pathname);
+  }catch(problem){setError(problem instanceof TypeError?'Cannot reach the account service. Check your connection and try again.':problem.message)}
+  finally{setBusy(false)}
+ };
+ return <main className="login-screen"><section className="login-card"><a className="brand login-brand" href="/"><span className="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 8.5h18M16 8.5v16M8.5 16H23"/><circle cx="16" cy="16" r="12"/></svg></span><span className="brand-copy">tap<span>&go</span><small>NETWORK OPS</small></span></a><div className="login-eyebrow"><span className="pulse"/> STAFF ACCOUNT SETUP</div><h1>{complete?'Your account is ready':'Set your password'}</h1>{complete?<><p>Your password has been set. Open the Tap &amp; Go mobile app and sign in with the email address that received this invitation.</p><a className="primary-button login-submit" href="/">Continue to sign in</a></>:<><p>This one-time link expires after 24 hours. Choose a password of at least 12 characters.</p><form onSubmit={submit}><label htmlFor="setup-password">New password</label><input id="setup-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 12 characters"/><label htmlFor="setup-confirm-password">Confirm password</label><input id="setup-confirm-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required value={confirmPassword} onChange={event=>setConfirmPassword(event.target.value)} placeholder="Enter the same password again"/>{error&&<div className="login-error" role="alert">{error}</div>}<button className="primary-button login-submit" disabled={busy}>{busy?'Saving password...':'Set password securely'} <span></span></button></form></>}<div className="login-foot"><span>Secure one-time account invitation</span><span>Never share this link</span></div></section><div className="login-background-mark">T&amp;G</div></main>;
+}
+
 function LoginScreen({onLogin,notice}){
  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const submit=async event=>{event.preventDefault();setError('');setBusy(true);try{const response=await fetch(apiUrl('/api/auth/login'),{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const data=await responseData(response,'Login service');if(!response.ok)throw Error(data.error||`Unable to sign in (HTTP ${response.status}).`);if(!data.expiresAt||!data.token)throw Error('Login service did not return a secure session. Please try again.');onLogin(data)}catch(problem){setError(problem instanceof TypeError?'Cannot reach the login service. Check the backend connection and try again.':problem.message)}finally{setBusy(false)}};
@@ -368,8 +395,7 @@ function ProfileSettings({admin,onSaved,onMessage,mobileAccountRole,onMobileAcco
 function MobileAccounts({onMessage,role,onRoleChange}){
  const [data,setData]=useState({accounts:[],agents:[],distributors:[]});
  const [recordId,setRecordId]=useState('');
- const [email,setEmail]=useState('');const [password,setPassword]=useState('');
- const [createdCredentials,setCreatedCredentials]=useState(null);const [copiedCredentials,setCopiedCredentials]=useState(false);
+ const [email,setEmail]=useState('');
  const [superagentName,setSuperagentName]=useState('');const [managedAgentIds,setManagedAgentIds]=useState([]);
  const [editingScope,setEditingScope]=useState(null);
  const [editingSuperagent,setEditingSuperagent]=useState(null);
@@ -388,24 +414,27 @@ function MobileAccounts({onMessage,role,onRoleChange}){
  const availableSuperagentAgents=data.agents.filter(agent=>!assignedAgentIds.has(String(agent._id)));
  useEffect(()=>{setRecordId(available[0]?._id||'')},[role,data]);
  const create=async event=>{
-  event.preventDefault();setError('');setCreatedCredentials(null);setCopiedCredentials(false);setBusy(true);
+  event.preventDefault();setError('');setBusy(true);
   try{
    const body=role==='superagent'
-    ?{role,name:superagentName,managedAgentIds,email,password}
-    :{role,recordId,email,password};
+    ?{role,name:superagentName,managedAgentIds,email}
+    :{role,recordId,email};
    const response=await apiFetch('/api/admin/mobile-accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-   const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to create mobile account.');
-   if(role==='superagent')setCreatedCredentials({name:result.name,email:result.email,password});
-   setEmail('');setPassword('');setSuperagentName('');setManagedAgentIds([]);await refresh();onMessage(`${role==='superagent'?'Superagent':'Mobile'} login created for ${result.email}.`);
+   const result=await response.json();
+   if(!response.ok){
+    if(result.accountCreated)await refresh();
+    throw Error(result.error||'Unable to create mobile account.');
+   }
+   setEmail('');setSuperagentName('');setManagedAgentIds([]);await refresh();onMessage(`Account created. A secure setup link was emailed to ${result.email}.`);
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
- const copyCreatedCredentials=async()=>{
-  if(!createdCredentials)return;
+ const resendInvitation=async account=>{
+  setError('');setBusy(true);
   try{
-   if(!navigator.clipboard?.writeText)throw Error('Clipboard access is unavailable. Copy the email and password manually.');
-   await navigator.clipboard.writeText(`Superagent: ${createdCredentials.name}\nSign-in email: ${createdCredentials.email}\nPassword: ${createdCredentials.password}`);
-   setCopiedCredentials(true);
-  }catch(problem){setError(problem.message||'Unable to copy the Superagent credentials.')}
+   const response=await apiFetch(`/api/admin/mobile-accounts/${account.id}/invitation`,{method:'POST'});
+   const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to send the invitation email.');
+   await refresh();onMessage(`A new setup link was emailed to ${result.email}.`);
+  }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
  const saveScope=async()=>{
   if(!editingScope)return;
@@ -443,7 +472,7 @@ function MobileAccounts({onMessage,role,onRoleChange}){
    await refresh();onMessage(result.active?'Mobile account enabled.':'Mobile account disabled; active sessions were revoked.');
   }catch(problem){setError(problem.message)}
  };
- return <section className="panel profile-settings-card mobile-accounts-panel"><div className="panel-heading"><div><h2>Agent, distributor &amp; Superagent logins</h2><p>Passwords are stored as salted hashes. After creating a Superagent, their initial password is shown once so you can securely give them their sign-in details. Superagents can see only agents assigned here. They may create and edit agent profiles, but the admin must provision each agent's login and POS account. Staff cannot self-register.</p></div></div>
+ return <section className="panel profile-settings-card mobile-accounts-panel"><div className="panel-heading"><div><h2>Agent, distributor &amp; Superagent logins</h2><p>Creating an account emails a one-time password setup link that expires after 24 hours. Superagents can see only agents assigned here. They may create and edit agent profiles, but the admin must provision each agent's login and POS account. Staff cannot self-register.</p></div></div>
   <form className="profile-form" onSubmit={create}>
    <label htmlFor="mobile-account-role">Account type</label><select id="mobile-account-role" value={role} onChange={event=>onRoleChange(event.target.value)}><option value="agent">Agent</option><option value="distributor">Distributor</option><option value="superagent">Superagent</option></select>
    {role==='superagent'?<>
@@ -457,13 +486,11 @@ function MobileAccounts({onMessage,role,onRoleChange}){
     {!available.length&&<p>No unlinked {role} profiles available.</p>}
    </>}
    <label htmlFor="mobile-account-email">Sign-in email</label><input id="mobile-account-email" type="email" required maxLength="254" value={email} onChange={event=>setEmail(event.target.value)} placeholder="user@company.com"/>
-   <label htmlFor="mobile-account-password">Initial password</label><input id="mobile-account-password" type="password" required minLength="12" maxLength="1024" autoComplete="new-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 12 characters"/>
    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button className="primary-button" disabled={busy||(role==='superagent'?false:!available.length)}>{busy?'Creating...':role==='superagent'?'Create Superagent account':'Create mobile login'}</button></div>
   </form>
-  {createdCredentials&&<section className="superagent-credentials-handoff" aria-live="polite"><div><h3>Superagent account created</h3><p>Give this Superagent the details below to sign in from the mobile app's staff sign-in screen. Share them securely. This is a one-time handoff: the password is cleared when you hide it or leave Settings. You can set a new password later from <b>Edit Superagent account</b>.</p></div><dl><div><dt>Name</dt><dd>{createdCredentials.name}</dd></div><div><dt>Sign-in email</dt><dd>{createdCredentials.email}</dd></div><div><dt>Initial password</dt><dd><code>{createdCredentials.password}</code></dd></div></dl><div className="superagent-credential-actions"><button className="row-action" type="button" onClick={copyCreatedCredentials}>{copiedCredentials?'Credentials copied':'Copy login details'}</button><button className="row-action" type="button" onClick={()=>{setCreatedCredentials(null);setCopiedCredentials(false)}}>Hide password</button></div></section>}
   <div className="mobile-account-list-heading"><h3>Existing mobile accounts</h3><span>{data.accounts.length}</span></div>
-  <div className="mobile-account-list">{data.accounts.length?data.accounts.map(account=><div className="mobile-account-row" key={account.id}><div className="mobile-account-copy"><b>{account.profile?.name||'Profile'}</b><small>{account.role}  -  {account.email}  -  {account.active?'Active':'Disabled'}{account.role==='superagent'?`  -  ${account.managedAgents?.length||0} assigned agent(s)`:''}</small>
+  <div className="mobile-account-list">{data.accounts.length?data.accounts.map(account=><div className="mobile-account-row" key={account.id}><div className="mobile-account-copy"><b>{account.profile?.name||'Profile'}</b><small>{account.role}  -  {account.email}  -  {account.setupPending?'Pending password setup':account.active?'Active':'Disabled'}{account.role==='superagent'?`  -  ${account.managedAgents?.length||0} assigned agent(s)`:''}</small>
    {account.role==='superagent'&&<details className="superagent-scope"><summary>Edit Superagent account</summary>
     {editingSuperagent?.accountId===account.id?<div className="profile-form">
      <label>Name</label><input maxLength="80" value={editingSuperagent.name} onChange={event=>setEditingSuperagent(current=>({...current,name:event.target.value}))}/>
@@ -481,7 +508,7 @@ function MobileAccounts({onMessage,role,onRoleChange}){
      return <label key={agent._id}><input type="checkbox" disabled={disabled} checked={currentIds.includes(String(agent._id))} onChange={event=>setEditingScope({accountId:account.id,ids:event.target.checked?[...currentIds,agent._id]:currentIds.filter(id=>id!==String(agent._id))})}/>{agent.name}  -  {agent.agent_id}</label>
     })}
     {editingScope?.accountId===account.id&&<button className="row-action" disabled={busy} onClick={saveScope}>Save assigned agents</button>}
-   </details>}</div><div className="mobile-account-actions"><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>
+   </details>}</div><div className="mobile-account-actions">{account.setupPending&&<button className="subtle-button" disabled={busy} onClick={()=>resendInvitation(account)}>Resend invitation</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>
  </section>
 }
 
@@ -494,14 +521,13 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
  useEffect(()=>{if(zone&&zoneOptions.includes(zone))setCustomZone(false)},[zone,zoneOptions]);
  const [openingFloat,setOpeningFloat]=useState('0');
  const [email,setEmail]=useState(record?.mobileEmail||'');
- const [password,setPassword]=useState('');
  const [error,setError]=useState('');
  const [busy,setBusy]=useState(false);
  const kind=role==='agent'?'agents':'distributors';
  const submit=async event=>{
   event.preventDefault();setError('');setBusy(true);
   try{
-   const body={name,phone,place,zone,email,...(password?{password}:{})};
+   const body={name,phone,place,zone,email};
    let url=`/api/admin/${kind}`;
    let method='POST';
    if(record){url+=`/${record._id}`;method='PATCH'}
@@ -509,11 +535,11 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
    const response=await apiFetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
    const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to save profile.');
    onSaved(result.profile);
-   onMessage(record?`${role==='agent'?'Agent':'Distributor'} updated. Updated credentials will require a new sign-in.`:`${role==='agent'?'Agent':'Distributor'} created. Give ${email} the initial password you set.`);
+   onMessage(record?`${role==='agent'?'Agent':'Distributor'} updated. Updated credentials will require a new sign-in.`:`${role==='agent'?'Agent':'Distributor'} created. A secure password setup link was emailed to ${email}.`);
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
  return <section className="panel profile-settings-card network-profile-form">
-  <div className="panel-heading"><div><h2>{record?`Edit ${role}`:`Add ${role}`}</h2><p>{record?'Update contact details and mobile sign-in. Location is updated automatically from the mobile app. Float balance remains ledger-controlled.':'Create the profile and linked mobile login together. Location will be updated automatically when the user shares GPS from the mobile app. Share the email and initial password securely.'}</p></div></div>
+  <div className="panel-heading"><div><h2>{record?`Edit ${role}`:`Add ${role}`}</h2><p>{record?'Update contact details and mobile sign-in. Location is updated automatically from the mobile app. Float balance remains ledger-controlled.':'Create the profile and linked mobile login together. Location will be updated automatically when the user shares GPS from the mobile app. A one-time password setup link will be sent to the sign-in email.'}</p></div></div>
   <form className="profile-form" onSubmit={submit}>
    <label htmlFor="network-name">Full name</label><input id="network-name" required maxLength="80" value={name} onChange={event=>setName(event.target.value)} autoComplete="name"/>
    <label htmlFor="network-phone">Phone number</label><input id="network-phone" maxLength="32" value={phone} onChange={event=>setPhone(event.target.value)} autoComplete="tel"/>
@@ -521,7 +547,6 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
    {role==='agent'&&<><label htmlFor="network-zone">Agent zone</label><select id="network-zone" value={customZone?'__custom__':zone} onChange={event=>{const custom=event.target.value==='__custom__';setCustomZone(custom);setZone(custom?'':event.target.value)}}><option value="">Select an agent zone</option>{zoneOptions.map(option=><option key={option} value={option}>{option}</option>)}<option value="__custom__">Add a new zone...</option></select>{customZone&&<input aria-label="New operational zone" required maxLength="80" value={zone} onChange={event=>setZone(event.target.value)} placeholder="Enter new zone"/>}</>}
   {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (FRW)</label><input id="network-opening-float" type="number" min="0" step="1" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
    <label htmlFor="network-email">Sign-in email</label><input id="network-email" type="email" autoComplete="email" maxLength="254" required value={email} onChange={event=>setEmail(event.target.value)}/>
-   <label htmlFor="network-password">{record&&record.mobileEmail?'New password (optional)':'Initial password'}</label><input id="network-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required={!record||!record.mobileEmail} value={password} onChange={event=>setPassword(event.target.value)} placeholder={record?.mobileEmail?'Leave blank to keep current password':'At least 12 characters'}/>
    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button type="button" className="subtle-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={busy}>{busy?'Saving...':record?'Save changes':`Create ${role} & login`}</button></div>
   </form>

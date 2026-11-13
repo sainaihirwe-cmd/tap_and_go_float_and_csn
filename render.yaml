@@ -23,6 +23,10 @@ services:
         value: TapGoDev2026!
       - key: AUTH_SECRET
         generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
 
   - type: static
     name: tap-and-go-float-and-csn-frontend

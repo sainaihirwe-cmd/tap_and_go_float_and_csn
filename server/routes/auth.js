@@ -44,6 +44,47 @@ app.post('/api/auth/mobile/login', async (req, res) => {
     });
   } catch (error) { apiError(res, error); }
 });
+app.post('/api/auth/mobile/activate', async (req, res) => {
+  const token = typeof req.body?.token === 'string' ? req.body.token : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!/^[a-f\d]{64}$/i.test(token)) return res.status(400).json({ error: 'This account setup link is invalid or expired. Ask your administrator to resend it.' });
+  if (password.length < 12 || password.length > 1024) return res.status(400).json({ error: 'Password must be at least 12 characters.' });
+
+  const session = await mongoose.startSession();
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const passwordHash = hashPassword(password);
+    let activated = false;
+    await session.withTransaction(async () => {
+      activated = false;
+      const account = await MobileAccount.findOne({
+        inviteTokenHash: tokenHash,
+        setupPending: true,
+        active: true,
+        inviteExpiresAt: { $gt: new Date() }
+      }).select('+inviteTokenHash').session(session);
+      if (!account) return;
+
+      account.passwordHash = passwordHash;
+      account.active = true;
+      account.setupPending = false;
+      account.inviteTokenHash = undefined;
+      account.inviteExpiresAt = undefined;
+      account.sessionVersion += 1;
+      await account.save({ session });
+
+      if (account.role === 'agent' || account.role === 'distributor') {
+        const Profile = account.role === 'agent' ? Agent : Distributor;
+        const profileId = account.role === 'agent' ? account.agent : account.distributor;
+        await Profile.updateOne({ _id: profileId }, { $set: { passwordHash } }, { session });
+      }
+      activated = true;
+    });
+    if (!activated) return res.status(400).json({ error: 'This account setup link is invalid or expired. Ask your administrator to resend it.' });
+    res.json({ success: true });
+  } catch (error) { apiError(res, error); }
+  finally { await session.endSession(); }
+});
 app.post('/api/auth/commuter/register', async (req, res) => {
   try {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
