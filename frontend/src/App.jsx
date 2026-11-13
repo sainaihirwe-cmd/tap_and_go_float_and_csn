@@ -502,12 +502,21 @@ function MobileAccounts({onMessage,role,onRoleChange}){
     </div>:<button className="row-action" type="button" onClick={()=>setEditingSuperagent({accountId:account.id,name:account.profile?.name||'',email:account.email,password:''})}>Edit details and credentials</button>}
    </details>}
    {account.role==='superagent'&&<details className="superagent-scope"><summary>Manage assigned agents</summary>
-    {(editingScope?.accountId===account.id?availableSuperagentAgents:data.agents.filter(agent=>(account.managedAgents||[]).some(item=>String(item._id||item)===String(agent._id)))).map(agent=>{
-     const currentIds=editingScope?.accountId===account.id?editingScope.ids:(account.managedAgents||[]).map(item=>String(item._id||item));
-     const disabled=editingScope?.accountId===account.id?assignedAgentIds.has(String(agent._id)):false;
-     return <label key={agent._id}><input type="checkbox" disabled={disabled} checked={currentIds.includes(String(agent._id))} onChange={event=>setEditingScope({accountId:account.id,ids:event.target.checked?[...currentIds,agent._id]:currentIds.filter(id=>id!==String(agent._id))})}/>{agent.name}  -  {agent.agent_id}</label>
-    })}
-    {editingScope?.accountId===account.id&&<button className="row-action" disabled={busy} onClick={saveScope}>Save assigned agents</button>}
+    {editingScope?.accountId===account.id?<>
+     <p>Select any number of unassigned agents. An agent can belong to only one active Superagent.</p>
+     {availableSuperagentAgents.map(agent=>{
+      const currentIds=editingScope.ids;
+      return <label key={agent._id}><input type="checkbox" checked={currentIds.includes(String(agent._id))} onChange={event=>setEditingScope({accountId:account.id,ids:event.target.checked?[...currentIds,String(agent._id)]:currentIds.filter(id=>id!==String(agent._id))})}/>{agent.name}  -  {agent.agent_id}</label>
+     })}
+     {!availableSuperagentAgents.length&&<p>No unassigned agents are available.</p>}
+     <button className="row-action" type="button" disabled={busy} onClick={saveScope}>Save assigned agents</button>
+     <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope(null)}>Cancel</button>
+    </>:<>
+     {(account.managedAgents||[]).length
+      ?data.agents.filter(agent=>(account.managedAgents||[]).some(item=>String(item._id||item)===String(agent._id))).map(agent=><p key={agent._id}>{agent.name}  -  {agent.agent_id}</p>)
+      :<p>No agents assigned yet.</p>}
+     <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope({accountId:account.id,ids:(account.managedAgents||[]).map(item=>String(item._id||item))})}>Edit assignments</button>
+    </>}
    </details>}</div><div className="mobile-account-actions">{account.setupPending&&<button className="subtle-button" disabled={busy} onClick={()=>resendInvitation(account)}>Resend invitation</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>
  </section>
 }
