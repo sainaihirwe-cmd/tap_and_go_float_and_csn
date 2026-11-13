@@ -100,9 +100,9 @@ Commuters create an account in the mobile app and then see the live agent map ce
 | POST | `/api/agents/:id/support` | Send a location-tagged float-support request to admins and the agent's assigned active Superagent (mobile bearer token required); stored separately from agent–Superagent chat |
 | GET | `/api/agents/:id/float-settlements` | Agent's recent settlement reports (agent token required) |
 | POST | `/api/agents/:id/float-settlements` | Submit an end-of-day bank-slip report with a JPEG, PNG, or WebP proof image (maximum 2 MB; agent token required) |
-| GET | `/api/float-settlements` | Admin settlement queue and history |
+| GET | `/api/float-settlements` | Admin settlement queue and history; approved credits appear in the completed top-ups table |
 | GET | `/api/float-settlements/:id/bank-slip` | View bank-slip proof (administrator session required) |
-| PATCH | `/api/float-settlements/:id` | Approve a verified deposit to credit float, or reject with a reason (administrator session required) |
+| PATCH | `/api/float-settlements/:id` | Approve a verified deposit to credit float and record the resulting POS balance, or reject with a reason (administrator session required) |
 | PATCH | `/api/agents/:id/status` | Set agent availability |
 | GET | `/api/commuter/nearby?longitude=…&latitude=…` | Nearby agents with a GPS update in the last 15 minutes, public float band only, and commuter search log |
 | GET, POST | `/api/distributors` | List or register distributors |

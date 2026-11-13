@@ -263,6 +263,7 @@ app.patch('/api/float-settlements/:id', async (req, res) => {
           location: creditedAgent.location
         }], { session });
         report.approvedFloat = req.body.amountAdded;
+        report.floatBalanceAfter = creditedAgent.floatBalance;
         report.creditedTransaction = transaction._id;
       }
       report.status = status;

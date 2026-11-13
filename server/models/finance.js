@@ -27,6 +27,7 @@ const floatSettlementSchema = new mongoose.Schema({
   reviewedAt: Date,
   reviewNote: { type: String, default: '', trim: true, maxlength: 500 },
   approvedFloat: { type: Number, min: 0, default: 0 },
+  floatBalanceAfter: { type: Number, min: 0, default: null },
   creditedTransaction: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' }
 }, { timestamps: true });
 floatSettlementSchema.index({ status: 1, createdAt: -1 });

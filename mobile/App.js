@@ -91,6 +91,7 @@ const roleCopy = {
     'Please wait…':'Please wait…','Already have an account? Sign in':'Already have an account? Sign in','New commuter? Create an account':'New commuter? Create an account',
     'Agent, Distributor or Superagent sign in':'Agent, Distributor or Superagent sign in','Back to commuter account':'Back to commuter account',
     'Home':'Home','Messages':'Messages','Settings':'Settings','Close settings':'Close settings','Messages & support':'Messages & support',
+    'Account details':'Account details','Account':'Account','Account type':'Account type','Commuter':'Commuter','Agent':'Agent','Distributor':'Distributor','Superagent':'Superagent','Edit profile':'Edit profile','View account details and settings':'View account details and settings',
     'Superagent network':'Superagent network','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Manage only the agents assigned to you. POS accounts remain administrator-managed.',
     'Agent float support requests':'Agent float support requests','No float support requests from assigned agents.':'No float support requests from assigned agents.','Float support requested by':'Float support requested by','an assigned agent':'an assigned agent',
     'Your assigned agents':'Your assigned agents','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.',
@@ -149,6 +150,7 @@ const roleCopy = {
     'Email':'Imeyili','Password':'Ijambo ry’ibanga','Your password':'Ijambo ry’ibanga ryawe','Sign in':'Injira','Signing in…':'Urimo kwinjira…',
     'Agent, Distributor or Superagent sign in':'Kwinjira kw’umukozi, utanga amafaranga cyangwa superagent','Back to commuter account':'Subira kuri konti y’umugenzi',
     'Home':'Ahabanza','Messages':'Ubutumwa','Settings':'Igenamiterere','Close settings':'Funga igenamiterere','Messages & support':'Ubutumwa n’ubufasha',
+    'Account details':'Amakuru ya konti','Account':'Konti','Account type':'Ubwoko bwa konti','Commuter':'Umugenzi','Agent':'Agenti','Distributor':'Utanga amafaranga','Superagent':'Superagent','Edit profile':'Hindura imyirondoro','View account details and settings':'Reba amakuru ya konti n’igenamiterere',
     'Superagent network':'Urusobe rwa superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Ushobora gucunga abakozi bahawe konti yawe gusa. Umuyobozi ni we ucunga konti za POS.',
     'Agent float support requests':'Ubutumwa bwo kongererwa amafaranga','No float support requests from assigned agents.':'Nta butumwa bwo gusaba amafaranga buvuye ku bakozi wagenewe.','Float support requested by':'Gusaba kongererwa amafaranga byakozwe na','an assigned agent':'umukozi wagenewe',
     'Messages with your Superagent':'Ubutumwa na superagent wawe','Messages with assigned agents':'Ubutumwa n’abakozi wagenewe',
@@ -252,6 +254,7 @@ const roleCopy = {
     'Email':'E-mail','Password':'Mot de passe','Your password':'Votre mot de passe','Sign in':'Se connecter','Signing in…':'Connexion…',
     'Agent, Distributor or Superagent sign in':'Connexion agent, distributeur ou Superagent','Back to commuter account':'Retour au compte voyageur',
     'Home':'Accueil','Messages':'Messages','Settings':'Paramètres','Close settings':'Fermer les paramètres','Messages & support':'Messages et assistance',
+    'Account details':'Détails du compte','Account':'Compte','Account type':'Type de compte','Commuter':'Voyageur','Agent':'Agent','Distributor':'Distributeur','Superagent':'Superagent','Edit profile':'Modifier le profil','View account details and settings':'Voir les détails du compte et les paramètres',
     'Superagent network':'Réseau Superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Gérez uniquement les agents qui vous sont attribués. Les comptes POS restent gérés par l’administrateur.',
     'Agent float support requests':'Demandes de réapprovisionnement des agents','No float support requests from assigned agents.':'Aucune demande de réapprovisionnement des agents attribués.','Float support requested by':'Demande de réapprovisionnement envoyée par','an assigned agent':'un agent attribué',
     'Messages with your Superagent':'Messages avec votre Superagent','Messages with assigned agents':'Messages avec les agents attribués',
@@ -434,6 +437,35 @@ function Input({ label, value, onChangeText, ...props }) {
   </View>;
 }
 
+function AccountControl({ account, profile, role, language, expanded, onToggle, onSettings, onSignOut }) {
+  const accountType = role === 'commuter' ? 'Commuter' : role === 'agent' ? 'Agent' : role === 'distributor' ? 'Distributor' : 'Superagent';
+  return <>
+    <View style={styles.accountControlWrap}>
+      <TouchableOpacity accessibilityRole="button"
+        accessibilityLabel={translate(language, 'Account details')}
+        accessibilityHint={translate(language, 'View account details and settings')}
+        accessibilityState={{ expanded }}
+        onPress={onToggle} style={styles.avatar}>
+        <Text style={styles.avatarText}>👤</Text>
+      </TouchableOpacity>
+    {expanded && <View style={styles.accountMenu}>
+      <View style={styles.accountMenuHeading}>
+        <Text style={styles.accountMenuTitle}>{translate(language, 'Account details')}</Text>
+        <Text style={styles.accountMenuRole}>{translate(language, accountType)}</Text>
+      </View>
+      <View style={styles.accountDetailRow}><Text style={styles.accountDetailLabel}>{translate(language, 'Name')}</Text><Text style={styles.accountDetailValue}>{profile?.name||'—'}</Text></View>
+      <View style={styles.accountDetailRow}><Text style={styles.accountDetailLabel}>{translate(language, 'Email')}</Text><Text style={styles.accountDetailValue}>{account?.email||'—'}</Text></View>
+      {profile?.phone?<View style={styles.accountDetailRow}><Text style={styles.accountDetailLabel}>{translate(language, 'Phone number')}</Text><Text style={styles.accountDetailValue}>{profile.phone}</Text></View>:null}
+      {profile?.place?<View style={styles.accountDetailRow}><Text style={styles.accountDetailLabel}>{translate(language, 'Location / area')}</Text><Text style={styles.accountDetailValue}>{profile.place}</Text></View>:null}
+      <View style={styles.accountMenuActions}>
+        {role==='commuter'&&<TouchableOpacity accessibilityRole="button" onPress={onSettings} style={styles.accountMenuButton}><Text style={styles.settingsText}>{translate(language, 'Edit profile')}</Text></TouchableOpacity>}
+        <TouchableOpacity accessibilityRole="button" onPress={onSignOut} style={styles.accountMenuButton}><Text style={styles.signOut}>{translate(language, 'Sign out')}</Text></TouchableOpacity>
+      </View>
+    </View>}
+    </View>
+  </>;
+}
+
 export default function App() {
   const [role, setRole] = useState('commuter');
   const [commuterLanguage, setCommuterLanguage] = useState('rw');
@@ -478,6 +510,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [staffTab, setStaffTab] = useState('home');
   const [socketRefresh, setSocketRefresh] = useState(0);
   const [message, setMessage] = useState('');
@@ -523,6 +556,7 @@ export default function App() {
       setCommuterAuthOpen(true);
       setStaffLoginOpen(false);
       setProfileOpen(false);
+      setAccountMenuOpen(false);
       setTasks([]);
       setNearby([]);
       setNearbyCount(0);
@@ -891,6 +925,7 @@ export default function App() {
       commuterMapLoaded.current = '';
       setRole('commuter');
       setProfileOpen(false);
+      setAccountMenuOpen(false);
       setCommuterAuthOpen(true);
       setStaffTab('home');
       setStaffLoginOpen(false);
@@ -1122,6 +1157,7 @@ export default function App() {
     }
     setAccount(value => ({ ...value, ...result.account, entity: result.entity }));
     setProfileOpen(false);
+    setAccountMenuOpen(false);
     flash(translate(commuterLanguage, 'Profile updated successfully.'));
   }
 
@@ -1207,14 +1243,10 @@ export default function App() {
         {account?.role === 'commuter' && <>
         <View style={styles.accountBar}>
           <View style={styles.flex}><Text style={styles.cardTitle}>{profile?.name}</Text><Text style={styles.cardSub}>{account.email}</Text></View>
-          <View style={styles.accountActions}>
-            <TouchableOpacity accessibilityRole="button" onPress={() => setProfileOpen(value => !value)} style={styles.accountAction}>
-              <Text style={styles.settingsText}>{translate(commuterLanguage, profileOpen ? 'Close settings' : 'Settings')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity accessibilityRole="button" onPress={signOut} style={styles.accountAction}>
-              <Text style={styles.signOut}>{translate(commuterLanguage, 'Sign out')}</Text>
-            </TouchableOpacity>
-          </View>
+          <AccountControl account={account} profile={profile} role="commuter" language={commuterLanguage}
+            expanded={accountMenuOpen} onToggle={() => setAccountMenuOpen(value => !value)}
+            onSettings={() => {setAccountMenuOpen(false);setProfileOpen(value => !value)}}
+            onSignOut={() => {setAccountMenuOpen(false);signOut()}}/>
         </View>
         {profileOpen && <ProfileEditor role="commuter" profile={profile} email={account.email} language={commuterLanguage} onSaved={saveProfile}/>}
         </>}
@@ -1269,16 +1301,14 @@ export default function App() {
 
       {role !== 'commuter' && account?.role === role && <>
         <View style={styles.accountBar}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>👤</Text></View>
           <View style={styles.accountIdentity}>
             <Text style={styles.cardTitle} numberOfLines={1}>{profile?.name}</Text>
             <Text style={styles.cardSub} numberOfLines={1}>{account.email}</Text>
           </View>
-          <View style={styles.accountActions}>
-            <TouchableOpacity accessibilityRole="button" onPress={signOut} style={styles.accountAction}>
-              <Text style={styles.signOut}>{translate(commuterLanguage, 'Sign out')}</Text>
-            </TouchableOpacity>
-          </View>
+          <AccountControl account={account} profile={profile} role={role} language={commuterLanguage}
+            expanded={accountMenuOpen} onToggle={() => setAccountMenuOpen(value => !value)}
+            onSettings={() => {setAccountMenuOpen(false);setProfileOpen(value => !value)}}
+            onSignOut={() => {setAccountMenuOpen(false);signOut()}}/>
         </View>
         <View style={styles.staffTabs}>
           {(role === 'superagent' ? [['home', 'Home'], ['messages', 'Admin chat'], ['requests', 'Deletion requests']] : [['home', 'Home'], ['messages', 'Messages']]).map(([key, label]) =>
@@ -2011,6 +2041,16 @@ const styles = StyleSheet.create({
   legend: { backgroundColor: 'white', borderRadius: 9, padding: 11, marginTop: 11, gap: 6 },
   legendLine: { fontSize: 10, color: '#657168', lineHeight: 15 },
   accountBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 10, borderRadius: 9, marginTop: 10, gap: 9 },
+  accountControlWrap: { position: 'relative', zIndex: 5 },
+  accountMenu: { position: 'absolute', top: 44, right: 0, width: 260, maxWidth: 300, backgroundColor: 'white', borderWidth: 1, borderColor: '#dfe7df', borderRadius: 10, padding: 12, elevation: 8, shadowColor: '#1e3324', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
+  accountMenuHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#edf0ed' },
+  accountMenuTitle: { color: '#253129', fontSize: 12, fontWeight: '800' },
+  accountMenuRole: { color: '#287a5e', backgroundColor: '#edf6ef', borderRadius: 12, paddingVertical: 4, paddingHorizontal: 7, fontSize: 9, fontWeight: '700' },
+  accountDetailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingTop: 8 },
+  accountDetailLabel: { color: '#89938b', fontSize: 9, fontWeight: '600' },
+  accountDetailValue: { flexShrink: 1, color: '#344239', fontSize: 10, fontWeight: '600', textAlign: 'right' },
+  accountMenuActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, borderTopWidth: 1, borderTopColor: '#edf0ed', marginTop: 10, paddingTop: 8 },
+  accountMenuButton: { paddingVertical: 5, paddingHorizontal: 4 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#edf6ef', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 20 },
   accountIdentity: { flex: 1, minWidth: 0 },
