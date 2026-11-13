@@ -147,6 +147,11 @@ const roleCopy = {
     'Agent, Distributor or Superagent sign in':'Kwinjira kw’umukozi, utanga amafaranga cyangwa superagent','Back to commuter account':'Subira kuri konti y’umugenzi',
     'Home':'Ahabanza','Messages':'Ubutumwa','Settings':'Igenamiterere','Close settings':'Funga igenamiterere','Messages & support':'Ubutumwa n’ubufasha',
     'Superagent network':'Urusobe rwa superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Ushobora gucunga abakozi bahawe konti yawe gusa. Umuyobozi ni we ucunga konti za POS.',
+    'Messages with your Superagent':'Ubutumwa na superagent wawe','Messages with assigned agents':'Ubutumwa n’abakozi wagenewe',
+    'No messages with your Superagent yet.':'Nta butumwa urabona bwa superagent wawe.','Message your Superagent':'Andikira superagent wawe',
+    'No active Superagent is assigned to your account. Ask an administrator to assign one in Settings before sending a message.':'Nta superagent uhabwa konti yawe. Saba umuyobozi kuguhuza na superagent muri Igenamiterere mbere yo kohereza ubutumwa.',
+    'No assigned agents are available for direct messages.':'Nta bakozi wagenewe ushobora kwandikira.',
+    'New message from your Superagent.':'Ubutumwa bushya buvuye kuri superagent wawe.','New message from an assigned agent.':'Ubutumwa bushya buvuye ku mukozi wagenewe.',
     'Your assigned agents':'Abakozi wagenewe','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'Ushobora gucunga abakozi wagenewe gusa. Amafaranga yabo ya POS agaragara hano. Umuyobozi ni we ufungura konti zabo.',
     'Add agent':'Ongeraho umukozi','Edit agent profile':'Hindura imyirondoro y’umukozi','New agent profile':'Konti nshya y’umukozi','Agent name':'Amazina y’umukozi','Operating area':'Aho akorera',
     'Zone':'Agace','Agent zone':'Agace k’umukozi','The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.':'Konti y’umukozi itangira idafite amafaranga. Umuyobozi agomba kumufungurira konti ya POS akayishyiraho amafaranga.',
@@ -242,6 +247,11 @@ const roleCopy = {
     'Agent, Distributor or Superagent sign in':'Connexion agent, distributeur ou Superagent','Back to commuter account':'Retour au compte voyageur',
     'Home':'Accueil','Messages':'Messages','Settings':'Paramètres','Close settings':'Fermer les paramètres','Messages & support':'Messages et assistance',
     'Superagent network':'Réseau Superagent','Manage only the agents assigned to you. POS accounts remain administrator-managed.':'Gérez uniquement les agents qui vous sont attribués. Les comptes POS restent gérés par l’administrateur.',
+    'Messages with your Superagent':'Messages avec votre Superagent','Messages with assigned agents':'Messages avec les agents attribués',
+    'No messages with your Superagent yet.':'Aucun message avec votre Superagent pour le moment.','Message your Superagent':'Écrire à votre Superagent',
+    'No active Superagent is assigned to your account. Ask an administrator to assign one in Settings before sending a message.':'Aucun Superagent actif ne vous est attribué. Demandez à un administrateur de vous en attribuer un dans les paramètres avant d’envoyer un message.',
+    'No assigned agents are available for direct messages.':'Aucun agent attribué ne peut recevoir de messages directs.',
+    'New message from your Superagent.':'Nouveau message de votre Superagent.','New message from an assigned agent.':'Nouveau message d’un agent attribué.',
     'Your assigned agents':'Vos agents attribués','You can manage only agents assigned to your account. Their POS balance is shown here. Only an administrator can create agent sign-in and POS access.':'Vous gérez uniquement les agents attribués à votre compte. Leur solde POS apparaît ici. Seul un administrateur peut créer leurs accès.',
     'Add agent':'Ajouter un agent','Edit agent profile':'Modifier le profil agent','New agent profile':'Nouveau profil agent','Agent name':'Nom de l’agent','Operating area':'Zone d’activité',
     'Zone':'Zone','Agent zone':'Zone de l’agent','The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.':'Le profil démarre avec un solde nul. Un administrateur doit créer l’accès et le compte POS puis attribuer les fonds.',
@@ -448,6 +458,7 @@ export default function App() {
   const [tasksRefreshing, setTasksRefreshing] = useState(false);
   const tasksRefreshInProgress = useRef(false);
   const [inboxMessages, setInboxMessages] = useState([]);
+  const [superagentAssigned, setSuperagentAssigned] = useState(null);
   const [inboxDraft, setInboxDraft] = useState('');
   const [inboxSending, setInboxSending] = useState(false);
   const inboxSendInProgress = useRef(false);
@@ -564,6 +575,17 @@ export default function App() {
     }
   }, [account?.role, commuterLanguage]);
 
+  const loadAgentSuperagentInbox = useCallback(async () => {
+    if (account?.role !== 'agent' || !profileId) return;
+    try {
+      const inbox = await api(`/api/agents/${encodeURIComponent(profileId)}/superagent-inbox`);
+      setInboxMessages(inbox.messages || []);
+      setSuperagentAssigned(Boolean(inbox.assigned));
+    } catch (problem) {
+      flash(translate(commuterLanguage, problem.message));
+    }
+  }, [account?.role, profileId, commuterLanguage]);
+
   async function sendInboxMessage() {
     const text = inboxDraft.trim();
     if (!text || inboxSendInProgress.current) return;
@@ -582,6 +604,55 @@ export default function App() {
       setInboxSending(false);
     }
   }
+
+  async function sendAgentSuperagentMessage() {
+    const text = inboxDraft.trim();
+    if (!text || inboxSendInProgress.current) return;
+    inboxSendInProgress.current = true;
+    setInboxSending(true);
+    try {
+      const result = await api(`/api/agents/${encodeURIComponent(profileId)}/superagent-inbox`, {
+        method: 'POST', body: JSON.stringify({ text })
+      });
+      setInboxMessages(current => [...current.filter(item => item.sentAt !== result.message.sentAt), result.message].slice(-200));
+      setSuperagentAssigned(true);
+      setInboxDraft('');
+    } catch (problem) {
+      flash(translate(commuterLanguage, problem.message));
+    } finally {
+      inboxSendInProgress.current = false;
+      setInboxSending(false);
+    }
+  }
+
+  useEffect(() => {
+    if (account?.role !== 'agent') return undefined;
+    loadAgentSuperagentInbox();
+    const timer = setInterval(loadAgentSuperagentInbox, 20000);
+    return () => clearInterval(timer);
+  }, [account?.role, loadAgentSuperagentInbox]);
+
+  useEffect(() => {
+    if (account?.role !== 'agent') return undefined;
+    let active = true;
+    let socket;
+    SecureStore.getItemAsync('mobile_token').then(token => {
+      if (!active || !token) return;
+      socket = io(API, { auth: { token }, reconnection: true });
+      socket.on('agent:superagent-message', event => {
+        if (event.agentId !== String(profileId)) return;
+        setInboxMessages(current => [...current.filter(item => item.sentAt !== event.message.sentAt), event.message].slice(-200));
+        setSuperagentAssigned(true);
+        if (event.message?.sender === 'superagent') {
+          flash(`${translate(commuterLanguage, 'New message from your Superagent.')} ${event.message.text}`);
+        }
+      });
+    }).catch(problem => console.warn('Unable to connect for Superagent messages:', problem.message));
+    return () => {
+      active = false;
+      socket?.disconnect();
+    };
+  }, [account?.role, profileId, commuterLanguage, socketRefresh]);
 
   async function sendTaskMessage(task, text) {
     try {
@@ -1254,13 +1325,28 @@ export default function App() {
           </View>
         </>}
 
-        {role === 'agent' && !profileOpen && staffTab === 'messages' && <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>{translate(commuterLanguage, 'Messages & support')}</Text>
-          <Text style={styles.help}>{translate(commuterLanguage, 'Send a support request to network operations. Your current GPS position is included so an available distributor can be assigned.')}</Text>
-          <Input label={translate(commuterLanguage, 'Message (optional)')} value={supportMessage} onChangeText={setSupportMessage}
-            placeholder={translate(commuterLanguage, 'Tell operations what you need')} multiline maxLength={500}/>
-          <ActionButton onPress={requestFloatSupport}>{translate(commuterLanguage, 'Request float support')}</ActionButton>
-        </View>}
+        {role === 'agent' && !profileOpen && staffTab === 'messages' && <>
+          <DistributorInboxPanel
+            language={commuterLanguage}
+            messages={inboxMessages}
+            draft={inboxDraft}
+            onDraftChange={setInboxDraft}
+            onSend={sendAgentSuperagentMessage}
+            sending={inboxSending}
+            ownSender="agent"
+            title="Messages with your Superagent"
+            emptyText="No messages with your Superagent yet."
+            placeholder="Message your Superagent"
+          />
+          {superagentAssigned === false && <Text style={styles.help}>{translate(commuterLanguage, 'No active Superagent is assigned to your account. Ask an administrator to assign one in Settings before sending a message.')}</Text>}
+          <View style={styles.panel}>
+            <Text style={styles.sectionTitle}>{translate(commuterLanguage, 'Request float support')}</Text>
+            <Text style={styles.help}>{translate(commuterLanguage, 'Send an urgent support request to network operations. Your current GPS location is included so an available distributor can be assigned.')}</Text>
+            <Input label={translate(commuterLanguage, 'Message (optional)')} value={supportMessage} onChangeText={setSupportMessage}
+              placeholder={translate(commuterLanguage, 'Tell operations what you need')} multiline maxLength={500}/>
+            <ActionButton onPress={requestFloatSupport}>{translate(commuterLanguage, 'Request float support')}</ActionButton>
+          </View>
+        </>}
 
         {role === 'distributor' && !profileOpen && staffTab === 'home' && <>
           <View style={styles.distributorHero}>
@@ -1326,6 +1412,10 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [inboxMessages, setInboxMessages] = useState([]);
   const [inboxDraft, setInboxDraft] = useState('');
   const [inboxSending, setInboxSending] = useState(false);
+  const [agentInboxes, setAgentInboxes] = useState([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [agentDraft, setAgentDraft] = useState('');
+  const [agentSending, setAgentSending] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState('');
@@ -1338,14 +1428,19 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
-    const [agentRows, deletionRequests, inbox] = await Promise.all([
+    const [agentRows, deletionRequests, inbox, conversations] = await Promise.all([
       api('/api/agents'),
       api('/api/superagent/deletion-requests'),
-      api('/api/superagent/inbox')
+      api('/api/superagent/inbox'),
+      api('/api/superagent/agent-inboxes')
     ]);
     setAgents(agentRows);
     setRequests(deletionRequests);
     setInboxMessages(inbox.messages || []);
+    setAgentInboxes(conversations);
+    setSelectedAgentId(current => conversations.some(item => String(item.agent._id) === current)
+      ? current
+      : String(conversations[0]?.agent._id || ''));
   }
 
   useEffect(() => {
@@ -1353,15 +1448,20 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
     let socket;
     const load = async () => {
       try {
-        const [agentRows, deletionRequests, inbox] = await Promise.all([
+        const [agentRows, deletionRequests, inbox, conversations] = await Promise.all([
           api('/api/agents'),
           api('/api/superagent/deletion-requests'),
-          api('/api/superagent/inbox')
+          api('/api/superagent/inbox'),
+          api('/api/superagent/agent-inboxes')
         ]);
         if (active) {
           setAgents(agentRows);
           setRequests(deletionRequests);
           setInboxMessages(inbox.messages || []);
+          setAgentInboxes(conversations);
+          setSelectedAgentId(current => conversations.some(item => String(item.agent._id) === current)
+            ? current
+            : String(conversations[0]?.agent._id || ''));
         }
       } catch (problem) {
         if (active) onMessage(translate(language, problem.message));
@@ -1377,6 +1477,12 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
         if (event.message?.sender === 'admin') {
           onMessage(translate(language, 'New message from your administrator.'));
         }
+      });
+      socket.on('superagent:agent-message', event => {
+        setAgentInboxes(current => current.map(conversation => String(conversation.agent._id) === event.agentId
+          ? { ...conversation, messages: [...conversation.messages.filter(item => item.sentAt !== event.message.sentAt), event.message].slice(-200), updatedAt: event.message.sentAt }
+          : conversation));
+        if (event.message?.sender === 'agent') onMessage(translate(language, 'New message from an assigned agent.'));
       });
       socket.on('superagent:deletion-request-updated', request => {
         setRequests(current => [request, ...current.filter(item => item._id !== request._id)]);
@@ -1405,6 +1511,25 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
       onMessage(translate(language, problem.message));
     } finally {
       setInboxSending(false);
+    }
+  }
+
+  async function sendAgentMessage() {
+    const text = agentDraft.trim();
+    if (!text || !selectedAgentId || agentSending) return;
+    setAgentSending(true);
+    try {
+      const result = await api(`/api/superagent/agents/${encodeURIComponent(selectedAgentId)}/inbox`, {
+        method: 'POST', body: JSON.stringify({ text })
+      });
+      setAgentInboxes(current => current.map(conversation => String(conversation.agent._id) === selectedAgentId
+        ? { ...conversation, messages: [...conversation.messages.filter(item => item.sentAt !== result.message.sentAt), result.message].slice(-200), updatedAt: result.updatedAt }
+        : conversation));
+      setAgentDraft('');
+    } catch (problem) {
+      onMessage(translate(language, problem.message));
+    } finally {
+      setAgentSending(false);
     }
   }
 
@@ -1526,16 +1651,44 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
         <Text style={styles.cardTitle}>{translate(language, 'No agents assigned yet')}</Text>
         <Text style={styles.cardSub}>{translate(language, 'Ask an administrator to assign agents to your Superagent account.')}</Text>
       </View>}
-    </> : activeTab === 'messages' ? <DistributorInboxPanel
-      language={language}
-      messages={inboxMessages}
-      draft={inboxDraft}
-      onDraftChange={setInboxDraft}
-      onSend={sendInboxMessage}
-      sending={inboxSending}
-      ownSender="superagent"
-      title="Messages with administrator"
-    /> : <>
+    </> : activeTab === 'messages' ? <>
+      <DistributorInboxPanel
+        language={language}
+        messages={inboxMessages}
+        draft={inboxDraft}
+        onDraftChange={setInboxDraft}
+        onSend={sendInboxMessage}
+        sending={inboxSending}
+        ownSender="superagent"
+        title="Messages with administrator"
+        emptyText="No messages from operations yet."
+        placeholder="Message operations directly"
+      />
+      <View style={styles.panel}>
+        <Text style={styles.cardTitle}>{translate(language, 'Messages with assigned agents')}</Text>
+        {agentInboxes.length ? <View style={styles.actionRow}>
+          {agentInboxes.map(conversation => <TouchableOpacity key={conversation.agent._id}
+            accessibilityRole="button"
+            accessibilityState={{ selected: String(conversation.agent._id) === selectedAgentId }}
+            onPress={() => setSelectedAgentId(String(conversation.agent._id))}
+            style={[styles.smallAction, String(conversation.agent._id) === selectedAgentId && styles.staffTabActive]}>
+            <Text style={styles.settingsText}>{conversation.agent.name}</Text>
+          </TouchableOpacity>)}
+        </View> : <Text style={styles.help}>{translate(language, 'No assigned agents are available for direct messages.')}</Text>}
+        {selectedAgentId && <DistributorInboxPanel
+          language={language}
+          messages={agentInboxes.find(item => String(item.agent._id) === selectedAgentId)?.messages || []}
+          draft={agentDraft}
+          onDraftChange={setAgentDraft}
+          onSend={sendAgentMessage}
+          sending={agentSending}
+          ownSender="superagent"
+          title="Agent conversation"
+          emptyText="No messages with this agent yet."
+          placeholder="Message this agent"
+        />}
+      </View>
+    </> : <>
       <Text style={styles.sectionTitle}>{translate(language, 'Deletion request history')}</Text>
       {requests.map(request => <View key={request._id} style={styles.panel}>
         <View style={styles.row}>
@@ -1661,7 +1814,7 @@ function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, on
   </View>;
 }
 
-function DistributorInboxPanel({ language, messages, draft, onDraftChange, onSend, sending, ownSender = 'distributor', title = 'Operations inbox' }) {
+function DistributorInboxPanel({ language, messages, draft, onDraftChange, onSend, sending, ownSender = 'distributor', title = 'Operations inbox', emptyText = 'No direct messages yet. Send a message to operations if you need help.', placeholder = 'Message operations directly' }) {
   return <View style={styles.panel}>
     <Text style={styles.cardTitle}>{translate(language, title)}</Text>
     <View style={styles.conversation}>
@@ -1670,11 +1823,11 @@ function DistributorInboxPanel({ language, messages, draft, onDraftChange, onSen
         <Text style={styles.chatText}>{item.text}</Text>
         <Text style={styles.chatSender}>{item.sentAt ? new Date(item.sentAt).toLocaleString() : ''}</Text>
       </View>)}
-      {!messages.length ? <Text style={styles.help}>{translate(language, 'No direct messages yet. Send a message to operations if you need help.')}</Text> : null}
+      {!messages.length ? <Text style={styles.help}>{translate(language, emptyText)}</Text> : null}
     </View>
     <View style={styles.replyRow}>
       <TextInput value={draft} onChangeText={onDraftChange}
-        placeholder={translate(language, 'Message operations directly')} maxLength={500}
+        placeholder={translate(language, placeholder)} maxLength={500}
         style={[styles.input, styles.replyInput]} returnKeyType="send" onSubmitEditing={onSend}/>
       <TouchableOpacity accessibilityRole="button" disabled={!draft.trim() || sending} onPress={onSend}
         style={[styles.sendButton, (!draft.trim() || sending) && styles.disabled]}>

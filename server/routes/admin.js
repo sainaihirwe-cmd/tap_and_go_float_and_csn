@@ -246,6 +246,8 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
   try {
     const { email } = mobileCredentialsInput(req.body);
     const updates = adminProfileInput(req.body, 'agent');
+    const superagentId = String(req.body?.superagentId || '');
+    if (superagentId && !mongoose.isValidObjectId(superagentId)) return res.status(400).json({ error: 'Choose a valid active Superagent.' });
     const openingFloat = Number(req.body?.openingFloat ?? 0);
     if (!Number.isFinite(openingFloat) || openingFloat < 0) return res.status(400).json({ error: 'Opening float must be a non-negative amount.' });
     ensureInvitationConfigured();
@@ -277,6 +279,18 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
           agent: agent._id, amount: openingFloat, kind: 'float_top_up',
           ...(agent.location ? { location: agent.location } : {})
         }], { session });
+      }
+      if (superagentId) {
+        const assignment = await MobileAccount.updateOne(
+          { _id: superagentId, role: 'superagent', active: true },
+          { $addToSet: { managedAgents: agent._id } },
+          { session }
+        );
+        if (assignment.matchedCount !== 1) {
+          const error = new Error('The selected Superagent is no longer active. Refresh the form and try again.');
+          error.status = 409;
+          throw error;
+        }
       }
       result = { agent, account };
     });

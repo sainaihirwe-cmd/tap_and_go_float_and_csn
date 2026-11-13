@@ -1,5 +1,6 @@
 module.exports = (context) => {
-  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
+  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
+
 app.get('/api/distributor-inbox', async (req, res) => {
   try {
     const inbox = await DistributorInbox.findOne({ distributor: req.mobile.account.distributor })
@@ -116,6 +117,92 @@ app.post('/api/superagent/inbox', async (req, res) => {
     const event = { superagentId: String(account._id), message };
     broadcast('superagent:inbox-message', event);
     io.to(`mobile:${account._id}`).emit('superagent:inbox-message', event);
+    res.status(201).json({ message, updatedAt: inbox.updatedAt });
+  } catch (error) { apiError(res, error); }
+});
+
+app.get('/api/agents/:id/superagent-inbox', async (req, res) => {
+  try {
+    const agent = await Agent.findOne(mobileEntityQuery(req, req.params.id, 'agent_id')).select('_id').lean();
+    if (!agent) return res.status(404).json({ error: 'Agent not found.' });
+    const superagent = await MobileAccount.findOne({
+      role: 'superagent', active: true, managedAgents: agent._id
+    }).select('_id name').lean();
+    if (!superagent) return res.json({ assigned: false, superagent: null, messages: [], updatedAt: null });
+    const inbox = await AgentSuperagentInbox.findOne({ agent: agent._id, superagent: superagent._id }).select('messages updatedAt').lean();
+    res.json({
+      assigned: true,
+      superagent: { id: String(superagent._id), name: superagent.name },
+      messages: inbox?.messages || [],
+      updatedAt: inbox?.updatedAt || null
+    });
+  } catch (error) { apiError(res, error); }
+});
+
+app.post('/api/agents/:id/superagent-inbox', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters.' });
+    const agent = await Agent.findOne(mobileEntityQuery(req, req.params.id, 'agent_id')).select('_id name').lean();
+    if (!agent) return res.status(404).json({ error: 'Agent not found.' });
+    const superagent = await MobileAccount.findOne({
+      role: 'superagent', active: true, managedAgents: agent._id
+    }).select('_id').lean();
+    if (!superagent) return res.status(409).json({ error: 'No active Superagent is assigned to this agent. Ask an administrator to assign one in Settings.' });
+    const message = { sender: 'agent', senderName: agent.name, text, sentAt: new Date() };
+    const inbox = await AgentSuperagentInbox.findOneAndUpdate(
+      { agent: agent._id, superagent: superagent._id },
+      { $push: { messages: { $each: [message], $slice: -200 } } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    ).select('messages updatedAt');
+    const event = { superagentId: String(superagent._id), agentId: String(agent._id), message };
+    io.to(`mobile:${superagent._id}`).emit('superagent:agent-message', event);
+    const agentAccount = await MobileAccount.findOne({ role: 'agent', active: true, agent: agent._id }).select('_id').lean();
+    if (agentAccount) io.to(`mobile:${agentAccount._id}`).emit('agent:superagent-message', event);
+    res.status(201).json({ message, updatedAt: inbox.updatedAt });
+  } catch (error) { apiError(res, error); }
+});
+
+app.get('/api/superagent/agent-inboxes', async (req, res) => {
+  try {
+    const agentIds = req.mobile.account.managedAgents || [];
+    const [agents, inboxes] = await Promise.all([
+      Agent.find({ _id: { $in: agentIds }, archivedAt: null }).select('name agent_id place zone').sort({ name: 1 }).lean(),
+      AgentSuperagentInbox.find({ superagent: req.mobile.account._id, agent: { $in: agentIds } }).lean()
+    ]);
+    const inboxByAgent = new Map(inboxes.map(inbox => [String(inbox.agent), inbox]));
+    res.json(agents.map(agent => {
+      const inbox = inboxByAgent.get(String(agent._id));
+      return {
+        agent,
+        messages: inbox?.messages || [],
+        updatedAt: inbox?.updatedAt || null
+      };
+    }).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)));
+  } catch (error) { apiError(res, error); }
+});
+
+app.post('/api/superagent/agents/:agentId/inbox', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters.' });
+    const account = req.mobile.account;
+    if (!mongoose.isValidObjectId(req.params.agentId) ||
+        !account.managedAgents.some(id => String(id) === req.params.agentId)) {
+      return res.status(404).json({ error: 'Agent not found in your assigned network.' });
+    }
+    const agent = await Agent.findOne({ _id: req.params.agentId, archivedAt: null }).select('name').lean();
+    if (!agent) return res.status(404).json({ error: 'Agent not found in your assigned network.' });
+    const message = { sender: 'superagent', senderName: account.name, text, sentAt: new Date() };
+    const inbox = await AgentSuperagentInbox.findOneAndUpdate(
+      { agent: req.params.agentId, superagent: account._id },
+      { $push: { messages: { $each: [message], $slice: -200 } } },
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+    ).select('messages updatedAt');
+    const event = { superagentId: String(account._id), agentId: req.params.agentId, message };
+    const agentAccount = await MobileAccount.findOne({ role: 'agent', active: true, agent: req.params.agentId }).select('_id').lean();
+    if (agentAccount) io.to(`mobile:${agentAccount._id}`).emit('agent:superagent-message', event);
+    io.to(`mobile:${account._id}`).emit('superagent:agent-message', event);
     res.status(201).json({ message, updatedAt: inbox.updatedAt });
   } catch (error) { apiError(res, error); }
 });

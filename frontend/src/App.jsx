@@ -520,10 +520,21 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
  const [customZone,setCustomZone]=useState(Boolean(record?.zone&&!zoneOptions.includes(record.zone)));
  useEffect(()=>{if(zone&&zoneOptions.includes(zone))setCustomZone(false)},[zone,zoneOptions]);
  const [openingFloat,setOpeningFloat]=useState('0');
+ const [superagents,setSuperagents]=useState([]);
+ const [superagentId,setSuperagentId]=useState('');
  const [email,setEmail]=useState(record?.mobileEmail||'');
  const [error,setError]=useState('');
  const [busy,setBusy]=useState(false);
  const kind=role==='agent'?'agents':'distributors';
+ useEffect(()=>{
+  if(record||role!=='agent')return;
+  let active=true;
+  apiFetch('/api/admin/mobile-accounts').then(async response=>{
+   const value=await response.json();if(!response.ok)throw Error(value.error||'Unable to load Superagent assignments.');
+   if(active)setSuperagents(value.accounts.filter(account=>account.role==='superagent'&&account.active));
+  }).catch(problem=>{if(active)setError(problem.message)});
+  return()=>{active=false};
+ },[record,role]);
  const submit=async event=>{
   event.preventDefault();setError('');setBusy(true);
   try{
@@ -531,10 +542,14 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
    let url=`/api/admin/${kind}`;
    let method='POST';
    if(record){url+=`/${record._id}`;method='PATCH'}
-   else if(role==='agent')body.openingFloat=Number(openingFloat);
+   else if(role==='agent'){body.openingFloat=Number(openingFloat);if(superagentId)body.superagentId=superagentId}
    const response=await apiFetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-   const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to save profile.');
-   onSaved(result.profile);
+   const result=await response.json();
+   if(!response.ok){
+    if(result.accountCreated){await onSaved(result.profile);onMessage(result.error||'The profile was created, but its invitation could not be sent. Resend it from Settings.');return}
+    throw Error(result.error||'Unable to save profile.');
+   }
+   await onSaved(result.profile);
    onMessage(record?`${role==='agent'?'Agent':'Distributor'} updated. Updated credentials will require a new sign-in.`:`${role==='agent'?'Agent':'Distributor'} created. A secure password setup link was emailed to ${email}.`);
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
@@ -546,6 +561,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage,zoneOptions=
    <label htmlFor="network-place">Location / area</label><input id="network-place" maxLength="100" value={place} onChange={event=>setPlace(event.target.value)} placeholder="Town or operating area"/>
    {role==='agent'&&<><label htmlFor="network-zone">Agent zone</label><select id="network-zone" value={customZone?'__custom__':zone} onChange={event=>{const custom=event.target.value==='__custom__';setCustomZone(custom);setZone(custom?'':event.target.value)}}><option value="">Select an agent zone</option>{zoneOptions.map(option=><option key={option} value={option}>{option}</option>)}<option value="__custom__">Add a new zone...</option></select>{customZone&&<input aria-label="New operational zone" required maxLength="80" value={zone} onChange={event=>setZone(event.target.value)} placeholder="Enter new zone"/>}</>}
   {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (RWF)</label><input id="network-opening-float" type="number" min="0" step="1" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
+  {!record&&role==='agent'&&<><label htmlFor="network-superagent">Assign Superagent (optional)</label><select id="network-superagent" value={superagentId} onChange={event=>setSuperagentId(event.target.value)}><option value="">Leave unassigned</option>{superagents.map(account=><option key={account.id} value={account.id}>{account.profile?.name||account.email}</option>)}</select><p className="form-hint">A distributor is assigned to a replenishment task after the agent and distributor share recent GPS locations.</p></>}
    <label htmlFor="network-email">Sign-in email</label><input id="network-email" type="email" autoComplete="email" maxLength="254" required value={email} onChange={event=>setEmail(event.target.value)}/>
    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button type="button" className="subtle-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={busy}>{busy?'Saving...':record?'Save changes':`Create ${role} & login`}</button></div>
