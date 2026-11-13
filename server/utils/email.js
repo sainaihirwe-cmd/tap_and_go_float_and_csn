@@ -26,6 +26,8 @@ async function sendStaffInvitation({ email, name, role, token }) {
   const setupUrl = `${frontendUrl}/#setupToken=${encodeURIComponent(token)}`;
   const safeName = escapeHtml(name || role);
   const safeRole = escapeHtml(role);
+  const safeEmail = escapeHtml(email);
+  const safeSetupUrl = escapeHtml(setupUrl);
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -36,8 +38,8 @@ async function sendStaffInvitation({ email, name, role, token }) {
       from,
       to: [email],
       subject: `Set up your Tap & Go ${role} account`,
-      text: `Hello ${name || role},\n\nYour Tap & Go ${role} account is ready. Set your password using this one-time link (expires in 24 hours):\n${setupUrl}\n\nIf you were not expecting this email, you can ignore it.`,
-      html: `<p>Hello ${safeName},</p><p>Your Tap &amp; Go ${safeRole} account is ready. Use the one-time link below to set your password. It expires in 24 hours.</p><p><a href="${setupUrl}">Set up your account</a></p><p>If you were not expecting this email, you can ignore it.</p>`
+      text: `Hello ${name || role},\n\nYour Tap & Go ${role} account is ready.\nLogin email: ${email}\n\nCreate your password using this one-time link (expires in 24 hours):\n${setupUrl}\n\nAfter setting your password, sign in to the Tap & Go mobile app with the login email above and your new password. For your security, we never send passwords by email.\n\nIf you were not expecting this email, you can ignore it.`,
+      html: `<p>Hello ${safeName},</p><p>Your Tap &amp; Go ${safeRole} account is ready.</p><p><strong>Login email:</strong> ${safeEmail}</p><p>Create your password using this one-time link. It expires in 24 hours.</p><p><a href="${safeSetupUrl}">Set up your account</a></p><p>After setting your password, sign in to the Tap &amp; Go mobile app with the login email above and your new password. For your security, we never send passwords by email.</p><p>If you were not expecting this email, you can ignore it.</p>`
     })
   });
   if (!response.ok) {
