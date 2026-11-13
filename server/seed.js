@@ -1,6 +1,6 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const mongoose = require('mongoose');
-const { Agent, Distributor, Alert, Transaction } = require('./models');
+const { Agent, Distributor, Alert, Transaction } = require('./models/index');
 
 const agents = [
   ['Maya Patel','Soho','Zone 1',-0.133,51.514,18],

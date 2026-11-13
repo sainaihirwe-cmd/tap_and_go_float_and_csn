@@ -14,7 +14,7 @@ const { createServerConfig } = require('./config/serverConfig');
 const { validPoint, mobileProfileUpdates, publicIdQuery } = require('./utils/validation');
 const createAuthHelpers = require('./utils/auth');
 const { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation } = require('./utils/email');
-const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models');
+const { Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold } = require('./models/index');
 const { adminEmail, adminPassword, authSecret, allowedOrigins } = createServerConfig(process.env);
 
 if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.AUTH_SECRET)) {

@@ -336,8 +336,9 @@ async function requestAgentDeletion(req, res) {
 app.post('/api/superagent/agents/:id/deletion-requests', requestAgentDeletion);
 
 app.delete('/api/superagent/agents/:id', async (req, res) => {
-  const session = await mongoose.startSession();
+  let session;
   try {
+    session = await mongoose.startSession();
     if (!mongoose.isValidObjectId(req.params.id) ||
         !req.mobile.account.managedAgents.some(id => String(id) === req.params.id)) {
       return res.status(404).json({ error: 'Agent not found in your assigned network.' });
@@ -393,7 +394,7 @@ app.delete('/api/superagent/agents/:id', async (req, res) => {
     broadcast('agent:telemetry', agent);
     res.json({ id: String(agent._id), archived: true, loginDisabled: Boolean(agentAccount) });
   } catch (error) { apiError(res, error); }
-  finally { await session.endSession(); }
+  finally { if (session) await session.endSession(); }
 });
 
 app.get('/api/admin/superagent-deletion-requests', requireAdmin, async (_req, res) => {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, Linking, Platform, SafeAreaView, ScrollView, StatusBar,
+  ActivityIndicator, Image, Linking, Platform, SafeAreaView, ScrollView, StatusBar,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -99,6 +99,7 @@ const roleCopy = {
     'Save agent':'Save agent','Saving…':'Saving…','Agent details updated.':'Agent details updated.','Agent profile created. Ask an administrator to create the agent login and POS access.':'Agent profile created. Ask an administrator to create the agent login and POS access.',
     'Location not set':'Location not set','POS FLOAT':'POS FLOAT','Deletion request pending':'Deletion request pending','Deletion approved':'Deletion approved','Deletion request rejected':'Deletion request rejected','Delete agent':'Delete agent','Request deletion':'Request deletion','Reason for deletion request':'Reason for deletion request',
     'Admin response':'Admin response','An administrator approved deleting {name}. You can now delete this agent.':'An administrator approved deleting {name}. You can now delete this agent.','Delete {name}? This archives the agent, disables their login, and retains financial history.':'Delete {name}? This archives the agent, disables their login, and retains financial history.','Agent deleted and login disabled. Financial history was retained.':'Agent deleted and login disabled. Financial history was retained.',
+    'Confirm delete':'Confirm delete','Deleting…':'Deleting…','Dashboard refresh failed':'Dashboard refresh failed',
     'Explain why this agent should be removed':'Explain why this agent should be removed','Send request':'Send request','Sending…':'Sending…',
     'Deletion request sent to an administrator. The agent remains active until approval.':'Deletion request sent to an administrator. The agent remains active. If approved, you must confirm deletion.',
     'No agents assigned yet':'No agents assigned yet','Ask an administrator to assign agents to your Superagent account.':'Ask an administrator to assign agents to your Superagent account.',
@@ -161,6 +162,7 @@ const roleCopy = {
     'Save agent':'Bika umukozi','Agent details updated.':'Amakuru y’umukozi yahinduwe.','Agent profile created. Ask an administrator to create the agent login and POS access.':'Konti y’umukozi yafunguwe. Saba umuyobozi kumufungurira konti yo kwinjiramo na POS.',
     'Location not set':'Aho ari ntiharashyirwaho','POS FLOAT':'AMAFARANGA YA POS','Deletion request pending':'Gusaba gusiba birategereje','Deletion approved':'Gusiba byemewe','Deletion request rejected':'Gusiba byanzwe','Delete agent':'Siba agenti','Request deletion':'Saba gusiba','Reason for deletion request':'Impamvu yo gusaba gusiba',
     'Admin response':'Igisubizo cy’umuyobozi','An administrator approved deleting {name}. You can now delete this agent.':'Umuyobozi yemeye ko {name} asibwa. Ushobora gusiba uyu agenti.','Delete {name}? This archives the agent, disables their login, and retains financial history.':'Ushaka gusiba {name}? Konti ye izahagarikwa ariko amateka y’amafaranga azagumana.','Agent deleted and login disabled. Financial history was retained.':'Agenti yasibwe kandi konti yo kwinjira irahagarikwa. Amateka y’amafaranga yagumishijwe.',
+    'Confirm delete':'Emeza gusiba','Deleting…':'Birimo gusibwa…','Dashboard refresh failed':'Kuvugurura paji byanze',
     'Explain why this agent should be removed':'Sobanura impamvu uyu mukozi agomba kuvanwaho','Send request':'Ohereza ubusabe','Deletion request sent to an administrator. The agent remains active until approval.':'Ubusabe bwoherejwe ku muyobozi. Umukozi azakomeza gukora; niyemezwa, ugomba kwemeza ko asibwa.',
     'No agents assigned yet':'Nta bakozi wagenewe','Ask an administrator to assign agents to your Superagent account.':'Saba umuyobozi kuguha abakozi.',
     'Deletion requests':'Ubusabe bwo gusiba','Deletion request history':'Amateka y’ubusabe bwo gusiba','Your reason':'Impamvu yawe','Administrator response':'Igisubizo cy’umuyobozi',
@@ -263,6 +265,7 @@ const roleCopy = {
     'Save agent':'Enregistrer l’agent','Agent details updated.':'Profil agent mis à jour.','Agent profile created. Ask an administrator to create the agent login and POS access.':'Profil agent créé. Demandez à un administrateur de créer l’accès et le compte POS.',
     'Location not set':'Lieu non défini','POS FLOAT':'SOLDE POS','Deletion request pending':'Demande de suppression en attente','Deletion approved':'Suppression approuvée','Deletion request rejected':'Demande de suppression refusée','Delete agent':'Supprimer l’agent','Request deletion':'Demander la suppression','Reason for deletion request':'Motif de la demande de suppression',
     'Admin response':'Réponse de l’administrateur','An administrator approved deleting {name}. You can now delete this agent.':'Un administrateur a autorisé la suppression de {name}. Vous pouvez maintenant supprimer cet agent.','Delete {name}? This archives the agent, disables their login, and retains financial history.':'Supprimer {name} ? Son compte sera archivé et désactivé ; son historique financier sera conservé.','Agent deleted and login disabled. Financial history was retained.':'Agent supprimé et connexion désactivée. L’historique financier a été conservé.',
+    'Confirm delete':'Confirmer la suppression','Deleting…':'Suppression…','Dashboard refresh failed':'Échec de l’actualisation du tableau de bord',
     'Explain why this agent should be removed':'Expliquez pourquoi cet agent doit être retiré','Send request':'Envoyer la demande','Deletion request sent to an administrator. The agent remains active until approval.':'Demande envoyée à l’administrateur. L’agent reste actif ; si elle est approuvée, vous devrez confirmer sa suppression.',
     'No agents assigned yet':'Aucun agent attribué','Ask an administrator to assign agents to your Superagent account.':'Demandez à un administrateur de vous attribuer des agents.',
     'Deletion requests':'Demandes de suppression','Deletion request history':'Historique des demandes','Your reason':'Votre motif','Administrator response':'Réponse de l’administrateur',
@@ -1438,6 +1441,8 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [place, setPlace] = useState('');
   const [zone, setZone] = useState('');
   const [requestingId, setRequestingId] = useState('');
+  const [confirmingDeletionId, setConfirmingDeletionId] = useState('');
+  const [deletionError, setDeletionError] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -1617,27 +1622,25 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   }
 
   async function deleteApprovedAgent(agent) {
-    const confirmation = translate(language, 'Delete {name}? This archives the agent, disables their login, and retains financial history.')
-      .replace('{name}', agent.name);
-    Alert.alert(translate(language, 'Delete agent'), confirmation, [
-      { text: translate(language, 'Cancel'), style: 'cancel' },
-      {
-        text: translate(language, 'Delete agent'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setSaving(true);
-            await api(`/api/superagent/agents/${encodeURIComponent(agent._id)}`, { method: 'DELETE' });
-            await refresh();
-            onMessage(translate(language, 'Agent deleted and login disabled. Financial history was retained.'));
-          } catch (problem) {
-            onMessage(translate(language, problem.message));
-          } finally {
-            setSaving(false);
-          }
-        }
+    try {
+      setSaving(true);
+      setDeletionError('');
+      await api(`/api/superagent/agents/${encodeURIComponent(agent._id)}`, { method: 'DELETE' });
+      setAgents(current => current.filter(item => String(item._id) !== String(agent._id)));
+      setRequests(current => current.filter(item => String(item.agent?._id || item.agent) !== String(agent._id)));
+      setConfirmingDeletionId('');
+      onMessage(translate(language, 'Agent deleted and login disabled. Financial history was retained.'));
+      try {
+        await refresh();
+      } catch (problem) {
+        onMessage(`${translate(language, 'Agent deleted and login disabled. Financial history was retained.')} ${translate(language, 'Dashboard refresh failed')}: ${translate(language, problem.message)}`);
       }
-    ]);
+    } catch (problem) {
+      setDeletionError(translate(language, problem.message));
+      onMessage(translate(language, problem.message));
+    } finally {
+      setSaving(false);
+    }
   }
 
   const deletionRequestByAgent = requests.reduce((latest, request) => {
@@ -1692,9 +1695,17 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
             {deletionRequest?.status === 'pending'
               ? <View style={styles.actionFlex}><Text style={styles.pendingLabel}>{translate(language, 'Deletion request pending')}</Text></View>
               : deletionRequest?.status === 'approved'
-                ? <View style={styles.actionFlex}><ActionButton onPress={() => deleteApprovedAgent(agent)} disabled={saving}>{translate(language, 'Delete agent')}</ActionButton></View>
+                ? <View style={styles.actionFlex}><ActionButton onPress={() => { setConfirmingDeletionId(agent._id); setDeletionError(''); }} disabled={saving}>{translate(language, 'Delete agent')}</ActionButton></View>
                 : <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setRequestingId(agent._id); setReason(''); setError(''); }}>{translate(language, 'Request deletion')}</ActionButton></View>}
           </View>
+          {confirmingDeletionId === agent._id && <View style={styles.requestReasonBox}>
+            <Text style={styles.help}>{translate(language, 'Delete {name}? This archives the agent, disables their login, and retains financial history.').replace('{name}', agent.name)}</Text>
+            {deletionError ? <Text style={styles.error}>{deletionError}</Text> : null}
+            <View style={styles.actionRow}>
+              <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setConfirmingDeletionId(''); setDeletionError(''); }} disabled={saving}>{translate(language, 'Cancel')}</ActionButton></View>
+              <View style={styles.actionFlex}><ActionButton onPress={() => deleteApprovedAgent(agent)} disabled={saving}>{translate(language, saving ? 'Deleting…' : 'Confirm delete')}</ActionButton></View>
+            </View>
+          </View>}
           {deletionRequest?.status === 'rejected' && <View style={styles.requestReasonBox}>
             <Text style={styles.pendingLabel}>{translate(language, 'Deletion request rejected')}</Text>
             <Text style={styles.help}>{translate(language, 'Admin response')}: {deletionRequest.reviewNote}</Text>
