@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import 'leaflet/dist/leaflet.css';
 import { io } from 'socket.io-client';
 import { Activity, BarChart3, Bell, ClipboardList, FileText, LayoutDashboard, MapPin, MessageSquare, MessagesSquare, RefreshCw, Search, Send, Settings, Truck, Users } from 'lucide-react';
 import { OverviewPage, AgentsPage, DispatchPage, MessagesPage, ReportsPage, SettingsPage } from './dashboard/index.js';
@@ -593,21 +594,82 @@ function AdminCommuterMap(){
  const [location,setLocation]=useState(null);
  const [agents,setAgents]=useState([]);
  const [count,setCount]=useState(0);
- const [selectedId,setSelectedId]=useState(null);
  const [searchedAt,setSearchedAt]=useState(null);
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState('');
+ const [leaflet,setLeaflet]=useState(null);
+ const mapElement=useRef(null);
+ const mapInstance=useRef(null);
+ useEffect(()=>{
+  let active=true;
+  let map;
+  let resizeTimer;
+  import('leaflet').then(({default:Leaflet})=>{
+   if(!active||!mapElement.current)return;
+   map=Leaflet.map(mapElement.current,{scrollWheelZoom:true}).setView([-1.9441,30.0619],13);
+   Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+   }).addTo(map);
+   mapInstance.current=map;
+   setLeaflet(Leaflet);
+   resizeTimer=setTimeout(()=>map.invalidateSize(),0);
+  }).catch(problem=>{if(active)setError(`Unable to load interactive map: ${problem.message}`)});
+  return()=>{
+   active=false;
+   if(resizeTimer)clearTimeout(resizeTimer);
+   if(map){
+    if(mapInstance.current===map)mapInstance.current=null;
+    map.remove();
+   }
+  };
+ },[]);
+ useEffect(()=>{
+  const map=mapInstance.current;
+  if(!map||!leaflet)return;
+  if(!location){
+   map.setView([-1.9441,30.0619],13);
+   return;
+  }
+  const center=[location.latitude,location.longitude];
+  map.flyTo(center,16,{duration:0.6});
+  const overlay=leaflet.layerGroup().addTo(map);
+  leaflet.circle(center,{radius:500,color:'#287a5e',weight:1,dashArray:'5 6',fillColor:'#287a5e',fillOpacity:0.035}).addTo(overlay);
+  const home=leaflet.circleMarker(center,{radius:8,color:'#fff',weight:3,fillColor:'#176247',fillOpacity:1}).addTo(overlay);
+  home.bindPopup('Your location');
+  agents.forEach(agent=>{
+   const coordinates=agent.location?.coordinates;
+   if(!Array.isArray(coordinates)||coordinates.length!==2)return;
+   const level=agent.liquidityLevel||'high';
+   const colors={low:'#d96b5f',medium:'#e2a054',high:'#4e9a72'};
+   const marker=leaflet.circleMarker([coordinates[1],coordinates[0]],{
+    radius:8,color:'#fff',weight:2,fillColor:colors[level]||colors.high,fillOpacity:1
+   }).addTo(overlay);
+   const popup=document.createElement('div');
+   const name=document.createElement('strong');
+   name.textContent=agent.name||'Nearby agent';
+   const details=document.createElement('div');
+   details.textContent=`${agent.place||agent.zone||'Nearby'} · ${level==='low'?'Low':level==='medium'?'Medium':'High'} float · ${Math.round(agent.distanceMeters)} m away`;
+   popup.append(name,details);
+   marker.bindPopup(popup);
+  });
+  return()=>overlay.remove();
+ },[leaflet,location,agents]);
  const search=()=>{
   if(!navigator.geolocation){setError('Location is not supported by this browser.');return}
   setLoading(true);setError('');
   navigator.geolocation.getCurrentPosition(async position=>{
    const center={latitude:position.coords.latitude,longitude:position.coords.longitude};
+   setLocation(center);
+   setAgents([]);
+   setCount(0);
+   setSearchedAt(null);
    try{
     const query=new URLSearchParams({latitude:String(center.latitude),longitude:String(center.longitude),radius:'500'});
     const response=await apiFetch(`/api/commuter/nearby?${query}`);
     const result=await responseData(response,'Nearby agent search');
     if(!response.ok)throw Error(result.error||'Unable to search for nearby agents.');
-    setLocation(center);setAgents(result.agents||[]);setCount(result.count||0);setSelectedId(result.agents?.[0]?._id||null);setSearchedAt(new Date());
+    setAgents(result.agents||[]);setCount(result.count||0);setSearchedAt(new Date());
    }catch(problem){setError(problem.message)}
    finally{setLoading(false)}
   },problem=>{
@@ -615,46 +677,15 @@ function AdminCommuterMap(){
    setLoading(false);
   },{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
  };
- const selected=agents.find(agent=>agent._id===selectedId);
- const levelCounts=agents.reduce((counts,agent)=>{const level=agent.liquidityLevel||'high';counts[level]=(counts[level]||0)+1;return counts},{low:0,medium:0,high:0});
- const pointFor=agent=>{
-  const [longitude,latitude]=agent.location.coordinates;
-  const north=(latitude-location.latitude)*111320;
-  const east=(longitude-location.longitude)*111320*Math.cos(location.latitude*Math.PI/180);
-  return {x:320+east/500*150,y:180-north/500*150};
- };
- const levelName=level=>level==='low'?'Low float':level==='medium'?'Medium float':'High float';
- return <div className="commuter-map-layout">
-  <section className="panel commuter-map-panel">
-   <div className="panel-heading"><div><h2>Find nearby ticket top-ups</h2><p>Search for active agents within 500 m of your current location.</p></div><button className="primary-button commuter-search-button" onClick={search} disabled={loading}>{loading?'Finding agents...':location?'Refresh search':'Find agents near me'}</button></div>
-   <div className="commuter-risk-counts" aria-label="Agent counts by float availability">
-    <div className="commuter-risk-count low"><span><i className="commuter-dot low"/>Low float</span><b>{searchedAt?levelCounts.low:'-'}</b></div>
-    <div className="commuter-risk-count medium"><span><i className="commuter-dot medium"/>Medium float</span><b>{searchedAt?levelCounts.medium:'-'}</b></div>
-    <div className="commuter-risk-count high"><span><i className="commuter-dot high"/>High float</span><b>{searchedAt?levelCounts.high:'-'}</b></div>
-    <small>{searchedAt?`Counts for ${agents.length} agents shown${count>agents.length?` (nearest of ${count})`:''}.`:'Counts appear after searching. Balances are never shown.'}</small>
-   </div>
-   {error&&<p className="commuter-map-error" role="alert">{error}</p>}
-   {location?<div className="commuter-radar" role="img" aria-label={`Map showing ${count} active agents within 500 metres of your location`}>
-    <svg viewBox="0 0 640 360" aria-hidden="true">
-     <circle className="radar-ring" cx="320" cy="180" r="37.5"/><circle className="radar-ring" cx="320" cy="180" r="75"/><circle className="radar-ring" cx="320" cy="180" r="112.5"/><circle className="radar-ring" cx="320" cy="180" r="150"/>
-     <path className="radar-axis" d="M170 180h300M320 30v300"/>
-     <text className="radar-label" x="326" y="39">N</text><text className="radar-label" x="463" y="173">500 m</text><text className="radar-label" x="398" y="173">250 m</text>
-     <circle className="radar-home-halo" cx="320" cy="180" r="12"/><circle className="radar-home" cx="320" cy="180" r="5"/>
-     {agents.map(agent=>{const point=pointFor(agent);const level=agent.liquidityLevel||'high';return <g key={agent._id} className={`commuter-agent-marker ${level} ${agent._id===selectedId?'selected':''}`} transform={`translate(${point.x} ${point.y})`} role="button" tabIndex="0" aria-label={`${agent.name}, ${levelName(level)}, ${Math.round(agent.distanceMeters)} metres away`} onClick={()=>setSelectedId(agent._id)} onKeyDown={event=>event.key==='Enter'&&setSelectedId(agent._id)}><circle className="marker-hit" r="15"/><circle className="marker-core" r="6"/></g>})}
-    </svg>
-    <div className="radar-compass">500 m radius  -  location shown only for this search</div>
-   </div>:<div className="commuter-map-empty"><span className="alternate-icon"></span><b>See ticket agents around you</b><p>Your location is requested only when you search and is used to find active agents nearby.</p></div>}
+ return <section className="page-content alternate-view commuter-search-page">
+  <div className="page-heading"><div><div className="eyebrow"><span className="pulse"/> NETWORK OPERATIONS</div><h1>Commuter map</h1><p>Find active ticket agents near your current location.</p></div><button className="primary-button commuter-search-button" onClick={search} disabled={loading}>{loading?'Finding agents...':location?'Refresh my location':'Find agents near me'}</button></div>
+  {error&&<p className="commuter-map-error" role="alert">{error}</p>}
+  <section className="panel commuter-map-panel commuter-live-map-panel">
+   <div className="panel-heading"><div><h2>Live nearby agent map</h2><p>{searchedAt?`Updated ${searchedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} · ${count} active agent${count===1?'':'s'} within 500 m`:'Select “Find agents near me” to center the map on your location and search within 500 m.'}</p></div></div>
+   <div ref={mapElement} className="commuter-live-map" aria-label="Interactive map showing nearby ticket agents" role="application"/>
+   <div className="commuter-map-legend"><span><i className="commuter-location-dot"/>Your location</span><span><i className="commuter-dot low"/>Low float</span><span><i className="commuter-dot medium"/>Medium float</span><span><i className="commuter-dot high"/>High float</span>{searchedAt&&count===0&&<b>No active agents found within 500 m. Try refreshing your location.</b>}{count>agents.length&&<b>Showing the {agents.length} nearest of {count} agents.</b>}</div>
   </section>
-  <aside className="panel commuter-results">
-   <div className="commuter-results-heading"><div><h2>Nearby agents</h2><p>{searchedAt?`Updated ${searchedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:'Your search results will appear here'}</p></div>{location&&<span className="commuter-count">{count}</span>}</div>
-   {location&&!loading&&!error&&count===0&&<p className="commuter-no-results">No active agents with available float were found within 500 m. Try refreshing your location shortly.</p>}
-   {agents.map(agent=><button key={agent._id} className={`commuter-agent-row ${agent._id===selectedId?'selected':''}`} onClick={()=>setSelectedId(agent._id)}>
-    <i className={`commuter-dot ${agent.liquidityLevel||'high'}`}/><span className="commuter-agent-copy"><b>{agent.name}</b><small>{agent.place||agent.zone||'Nearby agent'}  -  {levelName(agent.liquidityLevel)}</small></span><span className="commuter-distance">{Math.round(agent.distanceMeters)} m</span>
-   </button>)}
-   {count>agents.length&&<p className="commuter-result-note">Showing the {agents.length} nearest of {count} agents.</p>}
-   {selected&&<div className="commuter-selected"><b>{selected.name}</b><span>{selected.place||selected.zone||'Nearby'}  -  {levelName(selected.liquidityLevel)}</span><a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.location.coordinates[1]},${selected.location.coordinates[0]}`} target="_blank" rel="noreferrer">Get directions <span aria-hidden="true"></span></a></div>}
-  </aside>
- </div>;
+ </section>;
 }
 
 function CommuterMap(){
