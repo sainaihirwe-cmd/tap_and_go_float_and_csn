@@ -334,7 +334,67 @@ async function requestAgentDeletion(req, res) {
 }
 
 app.post('/api/superagent/agents/:id/deletion-requests', requestAgentDeletion);
-app.delete('/api/superagent/agents/:id', requestAgentDeletion);
+
+app.delete('/api/superagent/agents/:id', async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    if (!mongoose.isValidObjectId(req.params.id) ||
+        !req.mobile.account.managedAgents.some(id => String(id) === req.params.id)) {
+      return res.status(404).json({ error: 'Agent not found in your assigned network.' });
+    }
+    let agent;
+    let agentAccount;
+    await session.withTransaction(async () => {
+      const approval = await SuperagentDeletionRequest.findOne({
+        agent: req.params.id,
+        superagent: req.mobile.account._id
+      }).sort({ createdAt: -1 }).session(session);
+      if (!approval || approval.status !== 'approved') {
+        const error = new Error('An administrator must approve the deletion request before you can delete this agent.');
+        error.status = 403;
+        throw error;
+      }
+      agent = await Agent.findOne({ _id: req.params.id, archivedAt: null }).session(session);
+      if (!agent) {
+        const error = new Error('Agent not found or already deleted.');
+        error.status = 404;
+        throw error;
+      }
+      const activeDispatch = await Dispatch.exists({
+        agent: agent._id,
+        status: { $in: ['assigned', 'en_route'] }
+      }).session(session);
+      if (activeDispatch) {
+        const error = new Error('Complete or cancel active dispatches before deleting this agent.');
+        error.status = 409;
+        throw error;
+      }
+      agent.archivedAt = new Date();
+      agent.status = 'offline';
+      await agent.save({ session });
+      await Alert.updateMany(
+        { agent: agent._id, state: { $in: ['open', 'dispatched'] } },
+        { $set: { state: 'resolved', resolved_status: true, resolvedAt: new Date() } },
+        { session }
+      );
+      agentAccount = await MobileAccount.findOne({ role: 'agent', agent: agent._id }).session(session);
+      if (agentAccount) {
+        agentAccount.active = false;
+        agentAccount.sessionVersion += 1;
+        await agentAccount.save({ session });
+      }
+      await MobileAccount.updateOne(
+        { _id: req.mobile.account._id, role: 'superagent', active: true },
+        { $pull: { managedAgents: agent._id } },
+        { session }
+      );
+    });
+    if (agentAccount) io.in(`mobile:${agentAccount._id}`).disconnectSockets(true);
+    broadcast('agent:telemetry', agent);
+    res.json({ id: String(agent._id), archived: true, loginDisabled: Boolean(agentAccount) });
+  } catch (error) { apiError(res, error); }
+  finally { await session.endSession(); }
+});
 
 app.get('/api/admin/superagent-deletion-requests', requireAdmin, async (_req, res) => {
   try {
@@ -355,8 +415,6 @@ app.patch('/api/admin/superagent-deletion-requests/:id', requireAdmin, async (re
   const session = await mongoose.startSession();
   try {
     let request;
-    let agent;
-    let account;
     await session.withTransaction(async () => {
       request = await SuperagentDeletionRequest.findOne({ _id: req.params.id, status: 'pending' }).session(session);
       if (!request) {
@@ -373,25 +431,11 @@ app.patch('/api/admin/superagent-deletion-requests/:id', requireAdmin, async (re
           error.status = 409;
           throw error;
         }
-        agent = await Agent.findOne({ _id: request.agent, archivedAt: null }).session(session);
+        const agent = await Agent.findOne({ _id: request.agent, archivedAt: null }).session(session);
         if (!agent) {
           const error = new Error('The requested agent is no longer active.');
           error.status = 409;
           throw error;
-        }
-        agent.archivedAt = new Date();
-        agent.status = 'offline';
-        await agent.save({ session });
-        await Alert.updateMany(
-          { agent: agent._id, state: { $in: ['open', 'dispatched'] } },
-          { $set: { state: 'resolved', resolved_status: true, resolvedAt: new Date() } },
-          { session }
-        );
-        account = await MobileAccount.findOne({ role: 'agent', agent: agent._id }).session(session);
-        if (account) {
-          account.active = false;
-          account.sessionVersion += 1;
-          await account.save({ session });
         }
       }
       request.status = status;
@@ -399,8 +443,6 @@ app.patch('/api/admin/superagent-deletion-requests/:id', requireAdmin, async (re
       request.reviewedAt = new Date();
       await request.save({ session });
     });
-    if (account) io.in(`mobile:${account._id}`).disconnectSockets(true);
-    if (agent) broadcast('agent:telemetry', agent);
     const populated = await SuperagentDeletionRequest.findById(request._id)
       .populate('agent', 'name agent_id place zone floatBalance archivedAt')
       .populate('superagent', 'name email').lean();

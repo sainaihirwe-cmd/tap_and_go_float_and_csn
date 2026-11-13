@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Image, Linking, Platform, SafeAreaView, ScrollView, StatusBar,
+  ActivityIndicator, Alert, Image, Linking, Platform, SafeAreaView, ScrollView, StatusBar,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -97,9 +97,10 @@ const roleCopy = {
     'Add agent':'Add agent','Edit agent profile':'Edit agent profile','New agent profile':'New agent profile','Agent name':'Agent name','Operating area':'Operating area',
     'Zone':'Zone','Agent zone':'Agent zone','The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.':'The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.',
     'Save agent':'Save agent','Saving…':'Saving…','Agent details updated.':'Agent details updated.','Agent profile created. Ask an administrator to create the agent login and POS access.':'Agent profile created. Ask an administrator to create the agent login and POS access.',
-    'Location not set':'Location not set','POS FLOAT':'POS FLOAT','Deletion request pending':'Deletion request pending','Request deletion':'Request deletion','Reason for deletion request':'Reason for deletion request',
+    'Location not set':'Location not set','POS FLOAT':'POS FLOAT','Deletion request pending':'Deletion request pending','Deletion approved':'Deletion approved','Deletion request rejected':'Deletion request rejected','Delete agent':'Delete agent','Request deletion':'Request deletion','Reason for deletion request':'Reason for deletion request',
+    'Admin response':'Admin response','An administrator approved deleting {name}. You can now delete this agent.':'An administrator approved deleting {name}. You can now delete this agent.','Delete {name}? This archives the agent, disables their login, and retains financial history.':'Delete {name}? This archives the agent, disables their login, and retains financial history.','Agent deleted and login disabled. Financial history was retained.':'Agent deleted and login disabled. Financial history was retained.',
     'Explain why this agent should be removed':'Explain why this agent should be removed','Send request':'Send request','Sending…':'Sending…',
-    'Deletion request sent to an administrator. The agent remains active until approval.':'Deletion request sent to an administrator. The agent remains active until approval.',
+    'Deletion request sent to an administrator. The agent remains active until approval.':'Deletion request sent to an administrator. The agent remains active. If approved, you must confirm deletion.',
     'No agents assigned yet':'No agents assigned yet','Ask an administrator to assign agents to your Superagent account.':'Ask an administrator to assign agents to your Superagent account.',
     'Deletion requests':'Deletion requests','Deletion request history':'Deletion request history','Your reason':'Your reason','Administrator response':'Administrator response',
     'You have not requested an agent deletion.':'You have not requested an agent deletion.','Admin approved the agent deletion request.':'Admin approved the agent deletion request.',
@@ -158,8 +159,9 @@ const roleCopy = {
     'Add agent':'Ongeraho umukozi','Edit agent profile':'Hindura imyirondoro y’umukozi','New agent profile':'Konti nshya y’umukozi','Agent name':'Amazina y’umukozi','Operating area':'Aho akorera',
     'Zone':'Agace','Agent zone':'Agace k’umukozi','The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.':'Konti y’umukozi itangira idafite amafaranga. Umuyobozi agomba kumufungurira konti ya POS akayishyiraho amafaranga.',
     'Save agent':'Bika umukozi','Agent details updated.':'Amakuru y’umukozi yahinduwe.','Agent profile created. Ask an administrator to create the agent login and POS access.':'Konti y’umukozi yafunguwe. Saba umuyobozi kumufungurira konti yo kwinjiramo na POS.',
-    'Location not set':'Aho ari ntiharashyirwaho','POS FLOAT':'AMAFARANGA YA POS','Deletion request pending':'Gusaba gusiba birategereje','Request deletion':'Saba gusiba','Reason for deletion request':'Impamvu yo gusaba gusiba',
-    'Explain why this agent should be removed':'Sobanura impamvu uyu mukozi agomba kuvanwaho','Send request':'Ohereza ubusabe','Deletion request sent to an administrator. The agent remains active until approval.':'Ubusabe bwoherejwe ku muyobozi. Umukozi azakomeza gukora kugeza bwemejwe.',
+    'Location not set':'Aho ari ntiharashyirwaho','POS FLOAT':'AMAFARANGA YA POS','Deletion request pending':'Gusaba gusiba birategereje','Deletion approved':'Gusiba byemewe','Deletion request rejected':'Gusiba byanzwe','Delete agent':'Siba agenti','Request deletion':'Saba gusiba','Reason for deletion request':'Impamvu yo gusaba gusiba',
+    'Admin response':'Igisubizo cy’umuyobozi','An administrator approved deleting {name}. You can now delete this agent.':'Umuyobozi yemeye ko {name} asibwa. Ushobora gusiba uyu agenti.','Delete {name}? This archives the agent, disables their login, and retains financial history.':'Ushaka gusiba {name}? Konti ye izahagarikwa ariko amateka y’amafaranga azagumana.','Agent deleted and login disabled. Financial history was retained.':'Agenti yasibwe kandi konti yo kwinjira irahagarikwa. Amateka y’amafaranga yagumishijwe.',
+    'Explain why this agent should be removed':'Sobanura impamvu uyu mukozi agomba kuvanwaho','Send request':'Ohereza ubusabe','Deletion request sent to an administrator. The agent remains active until approval.':'Ubusabe bwoherejwe ku muyobozi. Umukozi azakomeza gukora; niyemezwa, ugomba kwemeza ko asibwa.',
     'No agents assigned yet':'Nta bakozi wagenewe','Ask an administrator to assign agents to your Superagent account.':'Saba umuyobozi kuguha abakozi.',
     'Deletion requests':'Ubusabe bwo gusiba','Deletion request history':'Amateka y’ubusabe bwo gusiba','Your reason':'Impamvu yawe','Administrator response':'Igisubizo cy’umuyobozi',
     'You have not requested an agent deletion.':'Nta mukozi wasabye ko avanwaho.','Admin approved the agent deletion request.':'Umuyobozi yemeye ubusabe bwo gusiba umukozi.',
@@ -259,8 +261,9 @@ const roleCopy = {
     'Add agent':'Ajouter un agent','Edit agent profile':'Modifier le profil agent','New agent profile':'Nouveau profil agent','Agent name':'Nom de l’agent','Operating area':'Zone d’activité',
     'Zone':'Zone','Agent zone':'Zone de l’agent','The agent profile starts with zero float. An administrator must create the sign-in and POS account and arrange float.':'Le profil démarre avec un solde nul. Un administrateur doit créer l’accès et le compte POS puis attribuer les fonds.',
     'Save agent':'Enregistrer l’agent','Agent details updated.':'Profil agent mis à jour.','Agent profile created. Ask an administrator to create the agent login and POS access.':'Profil agent créé. Demandez à un administrateur de créer l’accès et le compte POS.',
-    'Location not set':'Lieu non défini','POS FLOAT':'SOLDE POS','Deletion request pending':'Demande de suppression en attente','Request deletion':'Demander la suppression','Reason for deletion request':'Motif de la demande de suppression',
-    'Explain why this agent should be removed':'Expliquez pourquoi cet agent doit être retiré','Send request':'Envoyer la demande','Deletion request sent to an administrator. The agent remains active until approval.':'Demande envoyée à l’administrateur. L’agent reste actif jusqu’à son approbation.',
+    'Location not set':'Lieu non défini','POS FLOAT':'SOLDE POS','Deletion request pending':'Demande de suppression en attente','Deletion approved':'Suppression approuvée','Deletion request rejected':'Demande de suppression refusée','Delete agent':'Supprimer l’agent','Request deletion':'Demander la suppression','Reason for deletion request':'Motif de la demande de suppression',
+    'Admin response':'Réponse de l’administrateur','An administrator approved deleting {name}. You can now delete this agent.':'Un administrateur a autorisé la suppression de {name}. Vous pouvez maintenant supprimer cet agent.','Delete {name}? This archives the agent, disables their login, and retains financial history.':'Supprimer {name} ? Son compte sera archivé et désactivé ; son historique financier sera conservé.','Agent deleted and login disabled. Financial history was retained.':'Agent supprimé et connexion désactivée. L’historique financier a été conservé.',
+    'Explain why this agent should be removed':'Expliquez pourquoi cet agent doit être retiré','Send request':'Envoyer la demande','Deletion request sent to an administrator. The agent remains active until approval.':'Demande envoyée à l’administrateur. L’agent reste actif ; si elle est approuvée, vous devrez confirmer sa suppression.',
     'No agents assigned yet':'Aucun agent attribué','Ask an administrator to assign agents to your Superagent account.':'Demandez à un administrateur de vous attribuer des agents.',
     'Deletion requests':'Demandes de suppression','Deletion request history':'Historique des demandes','Your reason':'Votre motif','Administrator response':'Réponse de l’administrateur',
     'You have not requested an agent deletion.':'Vous n’avez demandé la suppression d’aucun agent.','Admin approved the agent deletion request.':'L’administrateur a approuvé la suppression de l’agent.',
@@ -1599,7 +1602,7 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
       setSaving(true);
       setError('');
       const request = await api(`/api/superagent/agents/${encodeURIComponent(agent._id)}/deletion-requests`, {
-        method: 'DELETE',
+        method: 'POST',
         body: JSON.stringify({ reason: text })
       });
       setRequests(current => [request, ...current.filter(item => item._id !== request._id)]);
@@ -1613,7 +1616,38 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
     }
   }
 
-  const pendingAgentIds = new Set(requests.filter(request => request.status === 'pending').map(request => String(request.agent?._id || request.agent)));
+  async function deleteApprovedAgent(agent) {
+    const confirmation = translate(language, 'Delete {name}? This archives the agent, disables their login, and retains financial history.')
+      .replace('{name}', agent.name);
+    Alert.alert(translate(language, 'Delete agent'), confirmation, [
+      { text: translate(language, 'Cancel'), style: 'cancel' },
+      {
+        text: translate(language, 'Delete agent'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setSaving(true);
+            await api(`/api/superagent/agents/${encodeURIComponent(agent._id)}`, { method: 'DELETE' });
+            await refresh();
+            onMessage(translate(language, 'Agent deleted and login disabled. Financial history was retained.'));
+          } catch (problem) {
+            onMessage(translate(language, problem.message));
+          } finally {
+            setSaving(false);
+          }
+        }
+      }
+    ]);
+  }
+
+  const deletionRequestByAgent = requests.reduce((latest, request) => {
+    const agentId = String(request.agent?._id || request.agent);
+    const existing = latest.get(agentId);
+    if (!existing || new Date(request.createdAt || 0) >= new Date(existing.createdAt || 0)) {
+      latest.set(agentId, request);
+    }
+    return latest;
+  }, new Map());
   return <View style={styles.superagentContent}>
     {activeTab === 'home' ? <>
       <View style={styles.panel}>
@@ -1640,33 +1674,42 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
           <View style={styles.actionFlex}><ActionButton onPress={saveAgent} disabled={saving || !name.trim()}>{translate(language, saving ? 'Saving…' : 'Save agent')}</ActionButton></View>
         </View>
       </View>}
-      {agents.map(agent => <View key={agent._id} style={styles.agentManageCard}>
-        <View style={styles.row}>
-          <View style={styles.flex}>
-            <Text style={styles.cardTitle}>{agent.name}</Text>
-            <Text style={styles.cardSub}>{agent.agent_id} · {agent.place || agent.zone || translate(language, 'Location not set')}</Text>
+      {agents.map(agent => {
+        const deletionRequest = deletionRequestByAgent.get(String(agent._id));
+        return <View key={agent._id} style={styles.agentManageCard}>
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{agent.name}</Text>
+              <Text style={styles.cardSub}>{agent.agent_id} · {agent.place || agent.zone || translate(language, 'Location not set')}</Text>
+            </View>
+            <View style={styles.alignRight}>
+              <Text style={styles.panelEyebrow}>{translate(language, 'POS FLOAT')}</Text>
+              <Text style={styles.amount}>{currency(agent.floatBalance)}</Text>
+            </View>
           </View>
-          <View style={styles.alignRight}>
-            <Text style={styles.panelEyebrow}>{translate(language, 'POS FLOAT')}</Text>
-            <Text style={styles.amount}>{currency(agent.floatBalance)}</Text>
-          </View>
-        </View>
-        <View style={styles.actionRow}>
-          <View style={styles.actionFlex}><ActionButton secondary onPress={() => startEdit(agent)}>{translate(language, 'Edit')}</ActionButton></View>
-          {pendingAgentIds.has(String(agent._id))
-            ? <View style={styles.actionFlex}><Text style={styles.pendingLabel}>{translate(language, 'Deletion request pending')}</Text></View>
-            : <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setRequestingId(agent._id); setReason(''); setError(''); }}>{translate(language, 'Request deletion')}</ActionButton></View>}
-        </View>
-        {requestingId === agent._id && <View style={styles.requestReasonBox}>
-          <Input label={translate(language, 'Reason for deletion request')} value={reason} onChangeText={setReason}
-            placeholder={translate(language, 'Explain why this agent should be removed')} multiline maxLength={500}/>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.actionRow}>
-            <View style={styles.actionFlex}><ActionButton secondary onPress={() => setRequestingId('')}>{translate(language, 'Cancel')}</ActionButton></View>
-            <View style={styles.actionFlex}><ActionButton onPress={() => requestDeletion(agent)} disabled={!reason.trim() || saving}>{translate(language, saving ? 'Sending…' : 'Send request')}</ActionButton></View>
+            <View style={styles.actionFlex}><ActionButton secondary onPress={() => startEdit(agent)}>{translate(language, 'Edit')}</ActionButton></View>
+            {deletionRequest?.status === 'pending'
+              ? <View style={styles.actionFlex}><Text style={styles.pendingLabel}>{translate(language, 'Deletion request pending')}</Text></View>
+              : deletionRequest?.status === 'approved'
+                ? <View style={styles.actionFlex}><ActionButton onPress={() => deleteApprovedAgent(agent)} disabled={saving}>{translate(language, 'Delete agent')}</ActionButton></View>
+                : <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setRequestingId(agent._id); setReason(''); setError(''); }}>{translate(language, 'Request deletion')}</ActionButton></View>}
           </View>
-        </View>}
-      </View>)}
+          {deletionRequest?.status === 'rejected' && <View style={styles.requestReasonBox}>
+            <Text style={styles.pendingLabel}>{translate(language, 'Deletion request rejected')}</Text>
+            <Text style={styles.help}>{translate(language, 'Admin response')}: {deletionRequest.reviewNote}</Text>
+          </View>}
+          {requestingId === agent._id && <View style={styles.requestReasonBox}>
+            <Input label={translate(language, 'Reason for deletion request')} value={reason} onChangeText={setReason}
+              placeholder={translate(language, 'Explain why this agent should be removed')} multiline maxLength={500}/>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.actionRow}>
+              <View style={styles.actionFlex}><ActionButton secondary onPress={() => setRequestingId('')}>{translate(language, 'Cancel')}</ActionButton></View>
+              <View style={styles.actionFlex}><ActionButton onPress={() => requestDeletion(agent)} disabled={!reason.trim() || saving}>{translate(language, saving ? 'Sending…' : 'Send request')}</ActionButton></View>
+            </View>
+          </View>}
+        </View>;
+      })}
       {!agents.length && !formOpen && <View style={styles.empty}>
         <Text style={styles.cardTitle}>{translate(language, 'No agents assigned yet')}</Text>
         <Text style={styles.cardSub}>{translate(language, 'Ask an administrator to assign agents to your Superagent account.')}</Text>
