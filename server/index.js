@@ -72,6 +72,7 @@ const routeDependencies = {
   SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret,
   allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload,
   validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor,
+  notifyLowFloat: (...args) => routeDependencies.notifyLowFloat(...args),
   issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery,
   sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash,
   mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError,
