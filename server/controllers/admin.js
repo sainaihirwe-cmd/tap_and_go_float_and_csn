@@ -1,4 +1,5 @@
 module.exports = (context) => {
+  const { finishAgentShift, finishDistributorShift } = require('../utils/shifts');
   const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError, createInvitationToken, ensureInvitationConfigured, sendStaffInvitation } = context;
 app.get('/api/admin/mobile-accounts', requireAdmin, async (_req, res) => {
   try {
@@ -426,9 +427,15 @@ app.delete('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req
       status: { $in: ['assigned', 'en_route'] }
     });
     if (activeDispatch) return res.status(409).json({ error: 'Complete or cancel active dispatches before archiving this profile.' });
-    profile.archivedAt = new Date();
-    if (role === 'agent') profile.status = 'offline';
-    else profile.status = 'offline';
+    const archivedAt = new Date();
+    profile.archivedAt = archivedAt;
+    if (role === 'agent') {
+      finishAgentShift(profile, archivedAt);
+      profile.status = 'offline';
+    } else {
+      if (profile.status !== 'offline') finishDistributorShift(profile, archivedAt);
+      profile.status = 'offline';
+    }
     await profile.save();
     const account = await MobileAccount.findOneAndUpdate(
       { [role]: profile._id },

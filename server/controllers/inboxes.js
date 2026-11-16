@@ -1,4 +1,5 @@
 module.exports = (context) => {
+  const { finishAgentShift } = require('../utils/shifts');
   const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, AgentSuperagentInbox, AgentAdminInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
 
 app.get('/api/admin/agent-inbox', async (_req, res) => {
@@ -444,6 +445,7 @@ app.delete('/api/superagent/agents/:id', async (req, res) => {
         throw error;
       }
       agent.archivedAt = new Date();
+      finishAgentShift(agent, agent.archivedAt);
       agent.status = 'offline';
       await agent.save({ session });
       await Alert.updateMany(

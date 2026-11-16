@@ -15,6 +15,8 @@ const distributorSchema = new mongoose.Schema({
   archivedAt: { type: Date, default: null },
   duty_state: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
   dutyStartedAt: { type: Date, default: null },
+  lastDutySeconds: { type: Number, min: 0, default: 0 },
+  dutySeconds: { type: Number, min: 0, default: 0 },
   assigned_tasks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Dispatch' }],
   lastSeenAt: { type: Date, default: Date.now }
 }, { timestamps: true });

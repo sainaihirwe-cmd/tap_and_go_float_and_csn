@@ -1,4 +1,5 @@
 module.exports = (context) => {
+  const { finishAgentShift, finishDistributorShift } = require('../utils/shifts');
   const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError } = context;
   function haversineMeters([lon1, lat1], [lon2, lat2]) {
     const radians = value => value * Math.PI / 180;
@@ -180,6 +181,7 @@ app.patch('/api/distributors/:id/status',async(req,res)=>{
     if(status==='offline'&&await Dispatch.exists({distributor:distributor._id,status:{$in:['assigned','en_route']}}))return res.status(409).json({error:'Complete active dispatches before going off duty.'});
     const startedNewShift=status==='available'&&(!distributor.dutyStartedAt||distributor.status==='offline');
     if(startedNewShift)distributor.dutyStartedAt=new Date();
+    if(status==='offline'&&distributor.status!=='offline')finishDistributorShift(distributor);
     if(distributor.status!=='busy'||status==='offline')distributor.status=status;
     distributor.duty_state=status==='offline'?'inactive':'active';
     await distributor.save();
@@ -200,11 +202,7 @@ app.patch('/api/agents/:id/status',async(req,res)=>{
      if(!agent.shiftStartedAt)agent.shiftStartedAt=now;
      agent.status=agent.floatBalance<=lowFloatThreshold(agent)?'at_risk':'active';
    }else{
-     if(agent.shiftStartedAt){
-       agent.lastShiftSeconds=Math.max(0,Math.floor((now.getTime()-new Date(agent.shiftStartedAt).getTime())/1000));
-       agent.shiftSeconds=(Number(agent.shiftSeconds)||0)+agent.lastShiftSeconds;
-       agent.shiftStartedAt=null;
-     }
+     finishAgentShift(agent,now);
      agent.status='offline';
    }
    await agent.save();broadcast('agent:telemetry',agent);res.json(agent);

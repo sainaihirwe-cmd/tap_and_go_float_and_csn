@@ -31,6 +31,9 @@ const formatShiftDuration=seconds=>{
 const currentShiftDuration=agent=>agent.shiftStartedAt&&agent.status!=='offline'
   ?formatShiftDuration(Math.max(0,Math.floor((Date.now()-new Date(agent.shiftStartedAt).getTime())/1000)))
   :formatShiftDuration(agent.lastShiftSeconds);
+const currentDistributorShiftDuration=distributor=>distributor.dutyStartedAt&&distributor.status!=='offline'
+  ?formatShiftDuration(Math.max(0,Math.floor((Date.now()-new Date(distributor.dutyStartedAt).getTime())/1000)))
+  :formatShiftDuration(distributor.lastDutySeconds);
 const validAgentLocation=location=>location?.type==='Point'&&Array.isArray(location.coordinates)&&location.coordinates.length===2&&Number.isFinite(location.coordinates[0])&&Number.isFinite(location.coordinates[1])&&location.coordinates[0]>=-180&&location.coordinates[0]<=180&&location.coordinates[1]>=-90&&location.coordinates[1]<=90;
 const dispatchInstructionFor=agent=>`URGENT float transfer for ${agent?.name||'the selected agent'}${agent?.place||agent?.zone?` (${agent.place||agent.zone})`:''}. Please contact the agent now, confirm the amount needed, arrange the transfer as soon as possible, and record the actual amount delivered in the app.`;
 const agentLowFloatThreshold=agent=>Math.max(10000,Number(agent.floatReference||0)*0.1,Number(agent.safeThreshold||40));
@@ -908,13 +911,13 @@ function AlternateView({view,title,agents,distributors,alerts,agentMessages,agen
  {(view==='agents'||view==='distributors')&&profileEditor&&<NetworkProfileForm key={`${profileEditor.role}-${profileEditor.record?._id||'new'}`} role={profileEditor.role} record={profileEditor.record} zoneOptions={zones} onCancel={()=>setProfileEditor(null)} onSaved={async savedProfile=>{setProfileEditor(null);if(savedProfile?.zone)setZoneAgents(current=>[...current.filter(agent=>agent._id!==savedProfile._id),savedProfile]);onRefresh();if(includeArchived){try{const response=await apiFetch(`/api/${kind}?includeArchived=true`);if(!response.ok)throw Error('Profile saved, but the archived list could not be refreshed.');setArchivedRecords(await response.json())}catch(error){onMessage(error.message)}}}} onMessage={onMessage}/>}
  {(view==='agents'||view==='distributors')&&<section className="panel table-panel network-crud-panel">
   <div className="panel-heading"><div><h2>{role==='agent'?'Agent':'Distributor'} profiles &amp; mobile logins</h2><p>Create a profile with email/password access, update it, or archive it while keeping historical records.</p></div><label className="archive-toggle"><input type="checkbox" checked={includeArchived} onChange={event=>setIncludeArchived(event.target.checked)}/> Show archived</label></div>
-  <div className="table-scroll"><table><thead><tr><th>NAME / ID</th><th>PHONE</th><th>AREA</th><th>ZONE</th><th>MOBILE LOGIN</th><th>STATUS</th>{role==='distributor'&&<th>SHIFT STARTED</th>}<th>ADMIN ACTIONS</th></tr></thead><tbody>
+  <div className="table-scroll"><table><thead><tr><th>NAME / ID</th><th>PHONE</th><th>AREA</th><th>ZONE</th><th>MOBILE LOGIN</th><th>STATUS</th><th>SHIFT DURATION</th><th>ADMIN ACTIONS</th></tr></thead><tbody>
    {listed.map(record=><tr key={record._id}>
     <td><b>{record.name}</b><small>ID {displayRecordId(role==='agent'?record.agent_id||record._id:record.distributor_id||record._id)}</small></td>
     <td>{record.phone||'-'}</td><td>{record.place||'-'}</td><td>{record.zone||'-'}</td>
     <td>{record.mobileEmail?<><b className="network-login-email">{record.mobileEmail}</b><small>{record.mobileLoginActive?'Enabled':'Disabled'}</small></>:'Not provisioned'}</td>
     <td>{record.archivedAt?'Archived':record.status}</td>
-    {role==='distributor'&&<td>{record.dutyStartedAt?new Date(record.dutyStartedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}{record.dutyStartedAt&&<small>{record.status==='offline'?'Last shift started':'On duty since'}</small>}</td>}
+    <td><strong>{role==='agent'?currentShiftDuration(record):currentDistributorShiftDuration(record)}</strong><small>{(role==='agent'?record.shiftStartedAt&&record.status!=='offline':record.dutyStartedAt&&record.status!=='offline')?'Current shift':Number(role==='agent'?record.lastShiftSeconds:record.lastDutySeconds)>0?'Last shift':'No tracked shift'} · total {formatShiftDuration(role==='agent'?record.shiftSeconds:record.dutySeconds)}</small></td>
     <td className="crud-actions">{!record.archivedAt&&<button className="row-action" onClick={()=>setProfileEditor({role,record})}>Edit</button>}<button className={`row-action ${record.archivedAt?'':'reject-action'}`} onClick={()=>archiveProfile(record)}>{record.archivedAt?'Restore':'Archive'}</button></td>
    </tr>)}
   </tbody></table>{!listed.length&&<p className="empty-table">No {role} profiles yet. Use Add {role} to create a profile and linked login.</p>}</div>
