@@ -363,10 +363,19 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
       return res.status(502).json({ error: `The agent and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(result.account._id) });
     }
     broadcast('agent:telemetry', result.agent);
-    if (result.agent.floatBalance <= lowFloatThreshold(result.agent)) await notifyLowFloat(result.agent);
+    let warning;
+    if (result.agent.floatBalance <= lowFloatThreshold(result.agent)) {
+      try {
+        await notifyLowFloat(result.agent);
+      } catch (error) {
+        console.error('Agent and login were created, but the low-float alert could not be recorded:', error);
+        warning = 'The Agent and login were created, but the low-float alert could not be recorded. Review the alert queue.';
+      }
+    }
     res.status(201).json({
       profile: result.agent,
-      account: { id: String(result.account._id), role: result.account.role, email: result.account.email, active: result.account.active }
+      account: { id: String(result.account._id), role: result.account.role, email: result.account.email, active: result.account.active },
+      ...(warning ? { warning } : {})
     });
   } catch (error) { apiError(res, error); }
   finally { if (session) await session.endSession(); }

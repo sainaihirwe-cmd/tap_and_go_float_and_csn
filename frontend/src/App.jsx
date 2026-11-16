@@ -666,7 +666,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage}){
     throw Error(result.error||'Unable to save profile.');
    }
    await onSaved(result.profile);
-   onMessage(record?`${role==='agent'?'Agent':'Distributor'} updated. Updated credentials will require a new sign-in.`:`${role==='agent'?'Agent':'Distributor'} created. A secure password setup link was emailed to ${email}.`);
+   onMessage(result.warning|| (record?`${role==='agent'?'Agent':'Distributor'} updated. Updated credentials will require a new sign-in.`:`${role==='agent'?'Agent':'Distributor'} created. A secure password setup link was emailed to ${email}.`));
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
  return <section className="panel profile-settings-card network-profile-form">
