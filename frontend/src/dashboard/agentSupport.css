@@ -1,0 +1,56 @@
+.agent-support-table {
+  min-width: 760px;
+}
+
+.agent-support-table th {
+  padding: 9px 10px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.agent-support-table td {
+  padding: 9px 10px;
+  font-size: 10px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.agent-support-table td:first-child {
+  min-width: 135px;
+}
+
+.agent-support-table td > b,
+.agent-support-table td > strong {
+  font-size: 10px;
+}
+
+.agent-support-table td small {
+  display: block;
+  margin-top: 3px;
+  color: #89938a;
+  font-size: 9px;
+}
+
+.agent-support-table .agent-support-message {
+  min-width: 220px;
+  max-width: 440px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.agent-support-table .table-status {
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.agent-inbox .inbox-assign-button {
+  min-height: 29px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+
+@media (max-width: 560px) {
+  .agent-support-table {
+    min-width: 700px;
+  }
+}

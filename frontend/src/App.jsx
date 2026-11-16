@@ -780,19 +780,19 @@ function SettlementReports({reports,onReview}) {
 function AgentMessagesInbox({messages,onAssign}){
  return <section className="panel agent-inbox">
   <div className="panel-heading"><div><h2>Agent support requests</h2><p>Review agent messages and low-float alerts here. Assign a distributor to open requests; resolved requests remain available for reference.</p></div><span className="heading-count">{messages.length}</span></div>
-  {messages.length?messages.map(alert=>{
-   const agent=alert.agent||{};
-   return <article className="agent-inbox-message" key={alert._id}>
-    <div className="agent-inbox-message-head">
-     <div><b>{agent.name||'Agent'}</b><small>{agent.place||agent.zone||'Location not provided'}{agent.phone?`  -  ${agent.phone}`:''}</small></div>
-     <div className="agent-inbox-meta"><span className={`table-status ${alert.state==='resolved'?'healthy':alert.state==='dispatched'?'warning':'critical'}`}>{alert.state==='dispatched'?'Assigned':alert.state==='open'?'Awaiting admin':alert.state}</span><time>{alert.triggeredAt?new Date(alert.triggeredAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}</time></div>
-    </div>
-    <p>{alert.message||'Agent requested float support.'}</p>
-    <div className="agent-inbox-footer"><span>Float at alert: <b>{money(alert.balanceAtTrigger??agent.floatBalance)}</b></span>
-    {alert.state==='open'&&<button className="inbox-assign-button" type="button" onClick={()=>onAssign(alert)}>Choose &amp; assign distributor</button>}
-    </div>
-   </article>;
-  }):<p className="empty-table">Agent support messages and low-float alerts will appear here. New messages arrive in real time.</p>}
+  {messages.length?<div className="table-scroll"><table className="agent-support-table"><thead><tr><th>AGENT</th><th>MESSAGE</th><th>FLOAT AT REQUEST</th><th>STATUS</th><th>RECEIVED</th><th>ACTION</th></tr></thead><tbody>
+   {messages.map(alert=>{
+    const agent=alert.agent||{};
+    return <tr key={alert._id}>
+     <td><b>{agent.name||'Agent'}</b><small>{agent.place||agent.zone||'Location not provided'}{agent.phone?` - ${agent.phone}`:''}</small></td>
+     <td className="agent-support-message">{alert.message||'Agent requested float support.'}</td>
+     <td><strong>{money(alert.balanceAtTrigger??agent.floatBalance)}</strong></td>
+     <td><span className={`table-status ${alert.state==='resolved'?'healthy':alert.state==='dispatched'?'warning':'critical'}`}>{alert.state==='dispatched'?'Assigned':alert.state==='open'?'Awaiting admin':alert.state}</span></td>
+     <td>{alert.triggeredAt?new Date(alert.triggeredAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}</td>
+     <td>{alert.state==='open'&&<button className="inbox-assign-button" type="button" onClick={()=>onAssign(alert)}>Choose &amp; assign</button>}</td>
+    </tr>;
+   })}
+  </tbody></table></div>:<p className="empty-table">Agent support messages and low-float alerts will appear here. New messages arrive in real time.</p>}
  </section>
 }
 
