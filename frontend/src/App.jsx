@@ -524,7 +524,31 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
    <div className="profile-form-actions"><button className="primary-button" disabled={busy||(role==='superagent'?false:!available.length)}>{busy?'Creating...':role==='superagent'?'Create Superagent account':'Create mobile login'}</button></div>
   </form>
   <div className="mobile-account-list-heading"><h3>{standalone?'Existing Superagents':'Existing mobile accounts'}</h3><span>{visibleAccounts.length}</span></div>
-  <div className="mobile-account-list">{visibleAccounts.length?visibleAccounts.map(account=><div className="mobile-account-row" key={account.id}><div className="mobile-account-copy"><b>{account.profile?.name||'Profile'}</b><small>{account.role}  -  {account.email}  -  {account.setupPending?'Pending password setup':account.active?'Active':'Disabled'}{account.role==='superagent'?`  -  ${account.managedAgents?.length||0} assigned agent(s)`:''}</small>
+  {standalone?<div className="table-scroll mobile-account-table-wrap"><table className="mobile-account-table"><thead><tr><th>SUPERAGENT</th><th>SIGN-IN EMAIL</th><th>ASSIGNED AGENTS</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>{visibleAccounts.map(account=><tr key={account.id}><td><b>{account.profile?.name||'Profile'}</b></td><td>{account.email}</td><td><details className="superagent-scope"><summary>{account.managedAgents?.length||0} agent(s)</summary>
+    {editingScope?.accountId===account.id?<>
+     <p>Select any number of unassigned agents. An agent can belong to only one active Superagent.</p>
+     {availableSuperagentAgents.map(agent=>{
+      const currentIds=editingScope.ids;
+      return <label key={agent._id}><input type="checkbox" checked={currentIds.includes(String(agent._id))} onChange={event=>setEditingScope({accountId:account.id,ids:event.target.checked?[...currentIds,String(agent._id)]:currentIds.filter(id=>id!==String(agent._id))})}/>{agent.name}  -  {agent.agent_id}</label>
+     })}
+     {!availableSuperagentAgents.length&&<p>No unassigned agents are available.</p>}
+     <button className="row-action" type="button" disabled={busy} onClick={saveScope}>Save assigned agents</button>
+     <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope(null)}>Cancel</button>
+    </>:<>
+     {(account.managedAgents||[]).length
+      ?data.agents.filter(agent=>(account.managedAgents||[]).some(item=>String(item._id||item)===String(agent._id))).map(agent=><p key={agent._id}>{agent.name}  -  {agent.agent_id}</p>)
+      :<p>No agents assigned yet.</p>}
+     <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope({accountId:account.id,ids:(account.managedAgents||[]).map(item=>String(item._id||item))})}>Edit assignments</button>
+    </>}
+   </details></td><td>{account.setupPending?'Pending setup':account.active?'Active':'Disabled'}</td><td className="mobile-account-table-actions">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button><details className="superagent-scope"><summary>Edit details</summary>
+    {editingSuperagent?.accountId===account.id?<div className="profile-form">
+     <label>Name</label><input maxLength="80" value={editingSuperagent.name} onChange={event=>setEditingSuperagent(current=>({...current,name:event.target.value}))}/>
+     <label>Sign-in email</label><input type="email" maxLength="254" value={editingSuperagent.email} onChange={event=>setEditingSuperagent(current=>({...current,email:event.target.value}))}/>
+     {error&&<div className="profile-form-error" role="alert">{error}</div>}
+     <button className="row-action" type="button" disabled={busy||!editingSuperagent.name.trim()||!editingSuperagent.email.trim()} onClick={saveSuperagent}>Save account</button>
+     <button className="row-action" type="button" onClick={()=>setEditingSuperagent(null)}>Cancel</button>
+    </div>:<button className="row-action" type="button" onClick={()=>setEditingSuperagent({accountId:account.id,name:account.profile?.name||'',email:account.email})}>Edit details</button>}
+   </details><button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button></td></tr>)}</tbody></table>{!visibleAccounts.length&&<p className="empty-table">No Superagent accounts have been created yet.</p>}</div>:<div className="mobile-account-list">{visibleAccounts.length?visibleAccounts.map(account=><div className="mobile-account-row" key={account.id}><div className="mobile-account-copy"><b>{account.profile?.name||'Profile'}</b><small>{account.role}  -  {account.email}  -  {account.setupPending?'Pending password setup':account.active?'Active':'Disabled'}{account.role==='superagent'?`  -  ${account.managedAgents?.length||0} assigned agent(s)`:''}</small>
    {account.role==='superagent'&&<details className="superagent-scope"><summary>Edit Superagent account</summary>
     {editingSuperagent?.accountId===account.id?<div className="profile-form">
      <label>Name</label><input maxLength="80" value={editingSuperagent.name} onChange={event=>setEditingSuperagent(current=>({...current,name:event.target.value}))}/>
@@ -550,7 +574,7 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
       :<p>No agents assigned yet.</p>}
      <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope({accountId:account.id,ids:(account.managedAgents||[]).map(item=>String(item._id||item))})}>Edit assignments</button>
     </>}
-   </details>}</div><div className="mobile-account-actions">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>
+   </details>}</div><div className="mobile-account-actions">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>}
  </section>
 }
 
