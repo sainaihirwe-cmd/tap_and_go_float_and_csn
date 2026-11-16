@@ -1473,8 +1473,6 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   const [place, setPlace] = useState('');
   const [zone, setZone] = useState('');
   const [requestingId, setRequestingId] = useState('');
-  const [confirmingDeletionId, setConfirmingDeletionId] = useState('');
-  const [deletionError, setDeletionError] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -1656,11 +1654,9 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
   async function deleteApprovedAgent(agent) {
     try {
       setSaving(true);
-      setDeletionError('');
       await api(`/api/superagent/agents/${encodeURIComponent(agent._id)}`, { method: 'DELETE' });
       setAgents(current => current.filter(item => String(item._id) !== String(agent._id)));
       setRequests(current => current.filter(item => String(item.agent?._id || item.agent) !== String(agent._id)));
-      setConfirmingDeletionId('');
       onMessage(translate(language, 'Agent deleted and login disabled. Financial history was retained.'));
       try {
         await refresh();
@@ -1668,7 +1664,6 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
         onMessage(`${translate(language, 'Agent deleted and login disabled. Financial history was retained.')} ${translate(language, 'Dashboard refresh failed')}: ${translate(language, problem.message)}`);
       }
     } catch (problem) {
-      setDeletionError(translate(language, problem.message));
       onMessage(translate(language, problem.message));
     } finally {
       setSaving(false);
@@ -1727,17 +1722,9 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
             {deletionRequest?.status === 'pending'
               ? <View style={styles.actionFlex}><ActionButton secondary disabled>{translate(language, 'Deletion request pending')}</ActionButton></View>
               : deletionRequest?.status === 'approved'
-                ? <View style={styles.actionFlex}><ActionButton onPress={() => { setConfirmingDeletionId(agent._id); setDeletionError(''); }} disabled={saving}>{translate(language, 'Delete agent')}</ActionButton></View>
+                ? <View style={styles.actionFlex}><ActionButton onPress={() => deleteApprovedAgent(agent)} disabled={saving}>{translate(language, saving ? 'Deleting…' : 'Delete agent')}</ActionButton></View>
                 : <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setRequestingId(agent._id); setReason(''); setError(''); }}>{translate(language, 'Request deletion')}</ActionButton></View>}
           </View>
-          {confirmingDeletionId === agent._id && <View style={styles.requestReasonBox}>
-            <Text style={styles.help}>{translate(language, 'Delete {name}? This archives the agent, disables their login, and retains financial history.').replace('{name}', agent.name)}</Text>
-            {deletionError ? <Text style={styles.error}>{deletionError}</Text> : null}
-            <View style={styles.actionRow}>
-              <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setConfirmingDeletionId(''); setDeletionError(''); }} disabled={saving}>{translate(language, 'Cancel')}</ActionButton></View>
-              <View style={styles.actionFlex}><ActionButton onPress={() => deleteApprovedAgent(agent)} disabled={saving}>{translate(language, saving ? 'Deleting…' : 'Confirm delete')}</ActionButton></View>
-            </View>
-          </View>}
           {deletionRequest?.status === 'rejected' && <View style={styles.requestReasonBox}>
             <Text style={styles.pendingLabel}>{translate(language, 'Deletion request rejected')}</Text>
             <Text style={styles.help}>{translate(language, 'Admin response')}: {deletionRequest.reviewNote}</Text>
