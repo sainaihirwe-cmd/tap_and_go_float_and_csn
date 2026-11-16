@@ -1,6 +1,6 @@
 module.exports = (context) => {
   const { finishAgentShift, finishDistributorShift } = require('../utils/shifts');
-  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError, createInvitationToken, ensureInvitationConfigured, sendStaffInvitation } = context;
+  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError, createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffPasswordReset } = context;
 app.get('/api/admin/mobile-accounts', requireAdmin, async (_req, res) => {
   try {
     const [accounts, agents, distributors] = await Promise.all([
@@ -12,6 +12,7 @@ app.get('/api/admin/mobile-accounts', requireAdmin, async (_req, res) => {
     res.json({
       accounts: accounts.map(account => ({
         id: String(account._id), role: account.role, email: account.email, active: account.active,
+        setupPending: account.setupPending,
         profile: account.agent || account.distributor || (account.role === 'superagent'
           ? { name: account.name, _id: account._id } : null),
         managedAgents: account.managedAgents || []
@@ -123,10 +124,74 @@ app.post('/api/admin/mobile-accounts/:id/invitation', requireAdmin, async (req, 
     res.status(error.status || 502).json({ error: `Unable to send the account invitation. ${error.message}` });
   }
 });
+app.post('/api/admin/mobile-accounts/:id/password-reset', requireAdmin, async (req, res) => {
+  let session;
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Mobile account not found.' });
+    ensureInvitationConfigured();
+    const invite = createInvitationToken();
+    const replacementPasswordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
+    let account;
+    let name;
+    let setupPending;
+    session = await mongoose.startSession();
+    await session.withTransaction(async () => {
+      account = await MobileAccount.findById(req.params.id).session(session);
+      if (!account) {
+        const error = new Error('Mobile account not found.');
+        error.status = 404;
+        throw error;
+      }
+      if (!account.active) {
+        const error = new Error('Enable this mobile account before resetting its password.');
+        error.status = 409;
+        throw error;
+      }
+      setupPending = account.setupPending;
+      name = account.name || account.role;
+      if (account.role === 'agent' || account.role === 'distributor') {
+        const Profile = account.role === 'agent' ? Agent : Distributor;
+        const profileId = account.role === 'agent' ? account.agent : account.distributor;
+        const profile = await Profile.findOne({ _id: profileId, archivedAt: null }).select('name').session(session);
+        if (!profile) {
+          const error = new Error('The mobile account profile is missing or archived.');
+          error.status = 409;
+          throw error;
+        }
+        name = profile.name;
+        await Profile.updateOne({ _id: profile._id }, { $set: { passwordHash: replacementPasswordHash } }, { session });
+      }
+      account.passwordHash = replacementPasswordHash;
+      account.inviteTokenHash = invite.tokenHash;
+      account.inviteExpiresAt = invite.expiresAt;
+      account.setupPending = true;
+      account.sessionVersion += 1;
+      await account.save({ session });
+    });
+    await session.endSession();
+    session = null;
+    io.in(`mobile:${account._id}`).disconnectSockets(true);
+    try {
+      const sendAccessEmail = setupPending ? sendStaffInvitation : sendStaffPasswordReset;
+      await sendAccessEmail({
+        email: account.email,
+        name,
+        role: account.role,
+        token: invite.token
+      });
+    } catch (error) {
+      console.error(`Unable to deliver ${account.role} access email:`, error.message);
+      return res.status(502).json({ error: `The old password has been revoked, but the access email could not be delivered. Try sending a new link. ${error.message}` });
+    }
+    res.json({ success: true, email: account.email, setupPending });
+  } catch (error) { apiError(res, error); }
+  finally { if (session) await session.endSession(); }
+});
 app.patch('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
   try {
     const account = await MobileAccount.findById(req.params.id);
     if (!account) return res.status(404).json({ error: 'Mobile account not found.' });
+    if (req.body?.password !== undefined) return res.status(400).json({ error: 'Use the password reset action to email a secure reset link.' });
     const updates = {};
     if (account.role === 'superagent') {
       if (req.body?.name !== undefined) {
@@ -152,13 +217,7 @@ app.patch('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
         }
         updates.email = email;
       }
-      if (req.body?.password !== undefined) {
-        if (typeof req.body.password !== 'string' || req.body.password.length < 12 || req.body.password.length > 1024) {
-          return res.status(400).json({ error: 'Password must be at least 12 characters.' });
-        }
-        updates.passwordHash = hashPassword(req.body.password);
-      }
-    } else if (req.body?.name !== undefined || req.body?.email !== undefined || req.body?.password !== undefined) {
+    } else if (req.body?.name !== undefined || req.body?.email !== undefined) {
       return res.status(400).json({ error: 'Only Superagent account details can be edited here.' });
     }
     if (req.body?.active !== undefined) {
@@ -358,10 +417,10 @@ app.post('/api/admin/distributors', requireAdmin, async (req, res) => {
 app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req, res) => {
   const role = req.params.role === 'agents' ? 'agent' : 'distributor';
   try {
+    if (req.body?.password !== undefined) return res.status(400).json({ error: 'Use the password reset action to email a secure reset link.' });
     const updates = adminProfileInput(req.body, role);
-    const { email, password } = mobileCredentialsInput(req.body);
+    const { email } = mobileCredentialsInput(req.body);
     const Model = role === 'agent' ? Agent : Distributor;
-    const passwordHash = password ? hashPassword(password) : null;
     const invite = createInvitationToken();
     const session = await mongoose.startSession();
     let profile;
@@ -382,7 +441,6 @@ app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req,
         account = await MobileAccount.findOne({ [role]: profile._id }).session(session);
         if (account) {
           account.email = email;
-          if (passwordHash) account.passwordHash = passwordHash;
           account.sessionVersion += 1;
           await account.save({ session });
         } else {
@@ -398,7 +456,6 @@ app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req,
           }], { session });
           sendInvitation = true;
         }
-        if (passwordHash) await Model.updateOne({ _id: profile._id }, { $set: { passwordHash } }, { session });
       });
     } finally { await session.endSession(); }
     if (sendInvitation) {

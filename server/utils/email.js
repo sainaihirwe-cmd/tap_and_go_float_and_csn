@@ -19,15 +19,42 @@ function ensureInvitationConfigured() {
 }
 
 async function sendStaffInvitation({ email, name, role, token }) {
+  await sendStaffAccessEmail({
+    email,
+    name,
+    role,
+    token,
+    mode: 'setup',
+    subject: `Set up your Tap & Go ${role} account`,
+    description: 'Your Tap & Go account is ready. Create your password using this one-time link:',
+    action: 'Set up your account'
+  });
+}
+
+async function sendStaffPasswordReset({ email, name, role, token }) {
+  await sendStaffAccessEmail({
+    email,
+    name,
+    role,
+    token,
+    mode: 'reset',
+    subject: `Reset your Tap & Go ${role} password`,
+    description: 'An administrator requested a password reset for your Tap & Go account. Choose a new password using this one-time link:',
+    action: 'Reset your password'
+  });
+}
+
+async function sendStaffAccessEmail({ email, name, role, token, mode, subject, description, action }) {
   ensureInvitationConfigured();
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
-  const setupUrl = `${frontendUrl}/#setupToken=${encodeURIComponent(token)}`;
+  const setupUrl = `${frontendUrl}/#setupToken=${encodeURIComponent(token)}&mode=${mode}`;
   const safeName = escapeHtml(name || role);
-  const safeRole = escapeHtml(role);
   const safeEmail = escapeHtml(email);
   const safeSetupUrl = escapeHtml(setupUrl);
+  const safeDescription = escapeHtml(description);
+  const safeAction = escapeHtml(action);
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -37,9 +64,9 @@ async function sendStaffInvitation({ email, name, role, token }) {
     body: JSON.stringify({
       from,
       to: [email],
-      subject: `Set up your Tap & Go ${role} account`,
-      text: `Hello ${name || role},\n\nYour Tap & Go ${role} account is ready.\nLogin email: ${email}\n\nCreate your password using this one-time link (expires in 24 hours):\n${setupUrl}\n\nAfter setting your password, sign in to the Tap & Go mobile app with the login email above and your new password. For your security, we never send passwords by email.\n\nIf you were not expecting this email, you can ignore it.`,
-      html: `<p>Hello ${safeName},</p><p>Your Tap &amp; Go ${safeRole} account is ready.</p><p><strong>Login email:</strong> ${safeEmail}</p><p>Create your password using this one-time link. It expires in 24 hours.</p><p><a href="${safeSetupUrl}">Set up your account</a></p><p>After setting your password, sign in to the Tap &amp; Go mobile app with the login email above and your new password. For your security, we never send passwords by email.</p><p>If you were not expecting this email, you can ignore it.</p>`
+      subject,
+      text: `Hello ${name || role},\n\n${description}\n\n${setupUrl}\n\nThis one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with ${email}. For your security, we never send passwords by email.\n\nIf you were not expecting this email, contact your administrator.`,
+      html: `<p>Hello ${safeName},</p><p>${safeDescription}</p><p><strong>Login email:</strong> ${safeEmail}</p><p><a href="${safeSetupUrl}">${safeAction}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap &amp; Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`
     })
   });
   if (!response.ok) {
@@ -58,4 +85,4 @@ function escapeHtml(value) {
   })[character]);
 }
 
-module.exports = { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation };
+module.exports = { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffPasswordReset };

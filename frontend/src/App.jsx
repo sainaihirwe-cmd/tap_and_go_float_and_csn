@@ -368,11 +368,12 @@ function DashboardApp(){
 }
 
 function App(){
- const setupToken=new URLSearchParams(window.location.hash.slice(1)).get('setupToken');
- return setupToken?<AccountSetupScreen token={setupToken}/>:<DashboardApp/>;
+ const setupParams=new URLSearchParams(window.location.hash.slice(1));
+ const setupToken=setupParams.get('setupToken');
+ return setupToken?<AccountSetupScreen token={setupToken} mode={setupParams.get('mode')}/>:<DashboardApp/>;
 }
 
-function AccountSetupScreen({token}){
+function AccountSetupScreen({token,mode}){
  const [password,setPassword]=useState('');
  const [confirmPassword,setConfirmPassword]=useState('');
  const [error,setError]=useState('');
@@ -391,7 +392,8 @@ function AccountSetupScreen({token}){
   }catch(problem){setError(problem instanceof TypeError?'Cannot reach the account service. Check your connection and try again.':problem.message)}
   finally{setBusy(false)}
  };
- return <main className="login-screen"><section className="login-card"><a className="brand login-brand" href="/"><span className="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 8.5h18M16 8.5v16M8.5 16H23"/><circle cx="16" cy="16" r="12"/></svg></span><span className="brand-copy">tap<span>&go</span><small>NETWORK OPS</small></span></a><div className="login-eyebrow"><span className="pulse"/> STAFF ACCOUNT SETUP</div><h1>{complete?'Your account is ready':'Set your password'}</h1>{complete?<><p>Your password has been set. Open the Tap &amp; Go mobile app and sign in with the email address that received this invitation.</p><a className="primary-button login-submit" href="/">Continue to sign in</a></>:<><p>This one-time link expires after 24 hours. Choose a password of at least 12 characters.</p><form onSubmit={submit}><label htmlFor="setup-password">New password</label><input id="setup-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 12 characters"/><label htmlFor="setup-confirm-password">Confirm password</label><input id="setup-confirm-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required value={confirmPassword} onChange={event=>setConfirmPassword(event.target.value)} placeholder="Enter the same password again"/>{error&&<div className="login-error" role="alert">{error}</div>}<button className="primary-button login-submit" disabled={busy}>{busy?'Saving password...':'Set password securely'} <span></span></button></form></>}<div className="login-foot"><span>Secure one-time account invitation</span><span>Never share this link</span></div></section><div className="login-background-mark">T&amp;G</div></main>;
+ const resetting=mode==='reset';
+ return <main className="login-screen"><section className="login-card"><a className="brand login-brand" href="/"><span className="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 8.5h18M16 8.5v16M8.5 16H23"/><circle cx="16" cy="16" r="12"/></svg></span><span className="brand-copy">tap<span>&go</span><small>NETWORK OPS</small></span></a><div className="login-eyebrow"><span className="pulse"/> STAFF PASSWORD {resetting?'RESET':'SETUP'}</div><h1>{complete?'Your account is ready':resetting?'Reset your password':'Set your password'}</h1>{complete?<><p>Your password has been set. Open the Tap &amp; Go mobile app and sign in with the email address that received this {resetting?'reset link':'invitation'}.</p><a className="primary-button login-submit" href="/">Continue to sign in</a></>:<><p>This one-time link expires after 24 hours. Choose a password of at least 12 characters.</p><form onSubmit={submit}><label htmlFor="setup-password">New password</label><input id="setup-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 12 characters"/><label htmlFor="setup-confirm-password">Confirm password</label><input id="setup-confirm-password" type="password" autoComplete="new-password" minLength="12" maxLength="1024" required value={confirmPassword} onChange={event=>setConfirmPassword(event.target.value)} placeholder="Enter the same password again"/>{error&&<div className="login-error" role="alert">{error}</div>}<button className="primary-button login-submit" disabled={busy}>{busy?'Saving password...':resetting?'Reset password securely':'Set password securely'} <span></span></button></form></>}<div className="login-foot"><span>Secure one-time password link</span><span>Never share this link</span></div></section><div className="login-background-mark">T&amp;G</div></main>;
 }
 
 function LoginScreen({onLogin,notice}){
@@ -460,6 +462,15 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
    await refresh();onMessage(`A new setup link was emailed to ${result.email}.`);
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
+ const resetPassword=async account=>{
+  if(!window.confirm(`Send a secure password reset link to ${account.email}? Their current password will stop working immediately.`))return;
+  setError('');setBusy(true);
+  try{
+   const response=await apiFetch(`/api/admin/mobile-accounts/${account.id}/password-reset`,{method:'POST'});
+   const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to send the password reset email.');
+   await refresh();onMessage(result.setupPending?`A new setup link was emailed to ${result.email}.`:`A password reset link was emailed to ${result.email}.`);
+  }catch(problem){setError(problem.message)}finally{setBusy(false)}
+ };
  const saveScope=async()=>{
   if(!editingScope)return;
   setError('');setBusy(true);
@@ -474,7 +485,6 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
   setError('');setBusy(true);
   try{
    const body={name:editingSuperagent.name,email:editingSuperagent.email};
-   if(editingSuperagent.password)body.password=editingSuperagent.password;
    const response=await apiFetch(`/api/admin/mobile-accounts/${editingSuperagent.accountId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
    const result=await response.json();if(!response.ok)throw Error(result.error||'Unable to update Superagent account.');
    setEditingSuperagent(null);await refresh();onMessage('Superagent account updated; active sessions were revoked.');
@@ -519,11 +529,10 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
     {editingSuperagent?.accountId===account.id?<div className="profile-form">
      <label>Name</label><input maxLength="80" value={editingSuperagent.name} onChange={event=>setEditingSuperagent(current=>({...current,name:event.target.value}))}/>
      <label>Sign-in email</label><input type="email" maxLength="254" value={editingSuperagent.email} onChange={event=>setEditingSuperagent(current=>({...current,email:event.target.value}))}/>
-     <label>Reset password (optional)</label><input type="password" autoComplete="new-password" minLength="12" maxLength="1024" placeholder="Leave blank to keep current password" value={editingSuperagent.password} onChange={event=>setEditingSuperagent(current=>({...current,password:event.target.value}))}/>
      {error&&<div className="profile-form-error" role="alert">{error}</div>}
      <button className="row-action" type="button" disabled={busy||!editingSuperagent.name.trim()||!editingSuperagent.email.trim()} onClick={saveSuperagent}>Save account</button>
      <button className="row-action" type="button" onClick={()=>setEditingSuperagent(null)}>Cancel</button>
-    </div>:<button className="row-action" type="button" onClick={()=>setEditingSuperagent({accountId:account.id,name:account.profile?.name||'',email:account.email,password:''})}>Edit details and credentials</button>}
+    </div>:<button className="row-action" type="button" onClick={()=>setEditingSuperagent({accountId:account.id,name:account.profile?.name||'',email:account.email})}>Edit details</button>}
    </details>}
    {account.role==='superagent'&&<details className="superagent-scope"><summary>Manage assigned agents</summary>
     {editingScope?.accountId===account.id?<>
@@ -541,7 +550,7 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
       :<p>No agents assigned yet.</p>}
      <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope({accountId:account.id,ids:(account.managedAgents||[]).map(item=>String(item._id||item))})}>Edit assignments</button>
     </>}
-   </details>}</div><div className="mobile-account-actions">{account.setupPending&&<button className="subtle-button" disabled={busy} onClick={()=>resendInvitation(account)}>Resend invitation</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>
+   </details>}</div><div className="mobile-account-actions">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password</button>}<button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>
  </section>
 }
 
