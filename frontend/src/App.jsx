@@ -61,6 +61,47 @@ async function responseData(response,service){
 
 const navigationIcons={overview:LayoutDashboard,agents:Users,distributors:Truck,dispatch:MessageSquare,chats:MessagesSquare,superagentRequests:ClipboardList,superagents:UserPlus,commuters:MapPin,liquidity:BarChart3,reports:FileText,settings:Settings};
 function Icon({name}){const Component=navigationIcons[name]||LayoutDashboard;return <Component className="nav-icon" size={16} strokeWidth={1.8} aria-hidden="true"/>}
+function DashboardTopActions({admin,onLogout,onNavigate,searchItems,notifications}){
+ const [openPanel,setOpenPanel]=useState('');
+ const [query,setQuery]=useState('');
+ const rootRef=useRef(null);
+ const searchRef=useRef(null);
+ const normalizedQuery=query.trim().toLowerCase();
+ const results=normalizedQuery?searchItems.filter(item=>`${item.title} ${item.detail} ${item.category}`.toLowerCase().includes(normalizedQuery)).slice(0,8):[];
+ useEffect(()=>{
+  const closeOnOutside=event=>{if(!rootRef.current?.contains(event.target))setOpenPanel('')};
+  const closeOnEscape=event=>{if(event.key==='Escape')setOpenPanel('')};
+  document.addEventListener('pointerdown',closeOnOutside);
+  document.addEventListener('keydown',closeOnEscape);
+  return()=>{document.removeEventListener('pointerdown',closeOnOutside);document.removeEventListener('keydown',closeOnEscape)};
+ },[]);
+ useEffect(()=>{if(openPanel==='search')searchRef.current?.focus()},[openPanel]);
+ const chooseItem=item=>{setOpenPanel('');setQuery('');onNavigate(item.view)};
+ return <div className="topbar-tools" ref={rootRef}>
+  <div className="topbar-tool">
+   <button className="icon-button" aria-label="Search network" aria-expanded={openPanel==='search'} title="Search" onClick={()=>setOpenPanel(current=>current==='search'?'':'search')}><Search size={17} strokeWidth={1.8} aria-hidden="true"/></button>
+   {openPanel==='search'&&<section className="topbar-popover search-popover" aria-label="Search network">
+    <label htmlFor="global-network-search">Search agents, distributors, alerts</label>
+    <div className="global-search-field"><Search size={15} aria-hidden="true"/><input ref={searchRef} id="global-network-search" type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Name, ID, zone, or message"/><kbd>ESC</kbd></div>
+    <div className="topbar-popover-list" aria-live="polite">{!normalizedQuery?<p className="topbar-popover-empty">Search across agents, distributors, alerts, and assignments.</p>:results.length?results.map(item=><button className="topbar-result" key={item.id} onClick={()=>chooseItem(item)}><span className="topbar-result-category">{item.category}</span><b>{item.title}</b><small>{item.detail}</small></button>):<p className="topbar-popover-empty">No matching records found.</p>}</div>
+   </section>}
+  </div>
+  <div className="topbar-tool">
+   <button className="icon-button notification-button" aria-label={`Notifications${notifications.length?`, ${notifications.length} needing attention`:''}`} aria-expanded={openPanel==='notifications'} title="Notifications" onClick={()=>setOpenPanel(current=>current==='notifications'?'':'notifications')}><Bell size={17} strokeWidth={1.8} aria-hidden="true"/>{notifications.length>0&&<i/>}</button>
+   {openPanel==='notifications'&&<section className="topbar-popover notification-popover" aria-label="Notifications">
+    <div className="topbar-popover-heading"><div><b>Notifications</b><small>{notifications.length?`${notifications.length} item${notifications.length===1?'':'s'} need attention`:'You are all caught up'}</small></div>{notifications.length>0&&<span>{notifications.length}</span>}</div>
+    <div className="topbar-popover-list">{notifications.length?notifications.slice(0,10).map(item=><button className="topbar-notification" key={item.id} onClick={()=>chooseItem(item)}><span className={`notification-mark ${item.kind}`}/><span><b>{item.title}</b><small>{item.detail}</small><small className="notification-time">{item.time}</small></span></button>):<p className="topbar-popover-empty">No new alerts or pending actions.</p>}</div>
+   </section>}
+  </div>
+  <div className="topbar-tool profile-tool" onMouseEnter={()=>setOpenPanel('profile')} onMouseLeave={()=>setOpenPanel(current=>current==='profile'?'':current)}>
+   <button className="top-avatar profile-trigger" aria-label="Administrator account" aria-expanded={openPanel==='profile'} title="Administrator account" onClick={()=>setOpenPanel('profile')}>{accountDisplayName(admin.name||admin.email).slice(0,1)}</button>
+   {openPanel==='profile'&&<section className="topbar-popover profile-popover" aria-label="Administrator account">
+    <div className="profile-popover-identity"><span className="top-avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</span><div><b>{admin.name||accountDisplayName(admin.email)}</b><small>{admin.email||'Administrator account'}</small></div></div>
+    <button className="profile-logout-button" onClick={()=>{setOpenPanel('');onLogout()}}>Log out</button>
+   </section>}
+  </div>
+ </div>
+}
 function MapArtwork({agents,distributors,onSelect}){
   const project=([lon,lat])=>({x:((lon+0.29)/0.27)*780,y:((51.57-lat)/0.19)*385});
   const streets=['M-10 66L793 304','M20 365L732 10','M45-10L520 395','M256-10L117 390','M591-10L388 390','M780 112L-10 207','M676 395L99-10','M0 130L787 226','M337-10L742 385','M-10 333L791 67'];
@@ -302,6 +343,17 @@ function Dashboard({admin,onLogout,onProfileSaved}){
     .sort((a,b)=>new Date(b.triggeredAt||0)-new Date(a.triggeredAt||0));
   const title=mapNames[view]||'Overview';
   const sessionTime=`${String(Math.floor(sessionRemaining/3600)).padStart(2,'0')}:${String(Math.floor(sessionRemaining%3600/60)).padStart(2,'0')}:${String(sessionRemaining%60).padStart(2,'0')}`;
+  const searchItems=[
+    ...agents.map(agent=>({id:`agent-${agent._id}`,category:'Agent',title:agent.name||'Agent',detail:[agent.agent_id,agent.phone,agent.place||agent.zone,agent.status].filter(Boolean).join(' · '),view:'agents'})),
+    ...distributors.map(distributor=>({id:`distributor-${distributor._id}`,category:'Distributor',title:distributor.name||'Distributor',detail:[distributor.distributor_id,distributor.phone,distributor.place||distributor.zone,distributor.status].filter(Boolean).join(' · '),view:'distributors'})),
+    ...alertRows.map(alert=>({id:`alert-${alert._id}`,category:'Priority alert',title:`Float support: ${alert.agent?.name||'Agent'}`,detail:[alert.agent?.place||alert.agent?.zone,alert.message,money(alert.balanceAtTrigger??alert.agent?.floatBalance)].filter(Boolean).join(' · '),view:'dispatch'})),
+    ...dispatches.map(item=>({id:`dispatch-${item._id}`,category:'Assignment',title:`Assignment: ${item.agent?.name||'Agent'}`,detail:[item.distributor?.name,item.status?.replace('_',' ')].filter(Boolean).join(' · '),view:'dispatch'}))
+  ];
+  const notifications=[
+    ...alertRows.map(alert=>({id:`alert-${alert._id}`,kind:'alert',title:`Float support needed: ${alert.agent?.name||'Agent'}`,detail:[alert.agent?.place||alert.agent?.zone,money(alert.balanceAtTrigger??alert.agent?.floatBalance)].filter(Boolean).join(' · '),time:alert.triggeredAt?new Date(alert.triggeredAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Just now',view:'dispatch',timestamp:new Date(alert.triggeredAt||0).getTime()})),
+    ...settlements.filter(report=>report.status==='pending').map(report=>({id:`settlement-${report._id}`,kind:'pending',title:`Settlement review: ${report.agent?.name||'Agent'}`,detail:`${money(report.reportedFloat)} awaiting approval`,time:report.createdAt?new Date(report.createdAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Pending review',view:'reports',timestamp:new Date(report.createdAt||0).getTime()})),
+    ...superagentDeletionRequests.filter(request=>request.status==='pending').map(request=>({id:`deletion-${request._id}`,kind:'pending',title:`Deletion request: ${request.agent?.name||'Agent'}`,detail:`From ${request.superagent?.name||request.superagent?.email||'Superagent'}`,time:request.createdAt?new Date(request.createdAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Pending review',view:'superagentRequests',timestamp:new Date(request.createdAt||0).getTime()}))
+  ].sort((a,b)=>b.timestamp-a.timestamp);
   return <div className="app-shell">
     <aside className="sidebar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setView('overview')}}><span className="brand-mark"><svg viewBox="0 0 32 32"><path d="M7 8.5h18M16 8.5v16M8.5 16H23"/><circle cx="16" cy="16" r="12"/></svg></span><span className="brand-copy">tap<span>&go</span><small>NETWORK OPS</small></span></a>
       <div className="workspace-switch"><span className="workspace-icon">L</span><span><b>London network</b><small>Operations workspace</small></span><span className="chevron"></span></div>
@@ -309,7 +361,7 @@ function Dashboard({admin,onLogout,onProfileSaved}){
       <div className="nav-label second-label">MANAGEMENT</div><nav className="main-nav">{['liquidity','reports'].map(name=><button key={name} className={`nav-item ${view===name?'active':''}`} onClick={()=>setView(name)}><Icon name={name}/>{mapNames[name]}{name==='reports'&&settlements.some(report=>report.status==='pending')&&<span className="nav-count alert-count">{settlements.filter(report=>report.status==='pending').length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><span className="help-spark"></span><b>Need a hand?</b><p>Call our operations support line.</p><button onClick={()=>setSupportOpen(true)}>Contact support <span></span></button></div><button className={`nav-item settings ${view==='settings'?'active':''}`} onClick={()=>setView('settings')}><Icon name="settings"/>Settings</button><div className="profile"><div className="avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</div><span><b>{accountDisplayName(admin.name||admin.email)}</b><small>Network administrator</small></span><span className="dots"> -  -  - </span></div></div>
     </aside>
-    <main className="main-content"><header className="topbar"><div className="breadcrumb">Network operations <span>/</span> <b>{title}</b></div><div className="top-actions"><div className="live-pill"><i className={connected?'':'offline-dot'}/>{connected?'Systems operational':'Demo data'}</div><div className={`session-timer ${sessionRemaining<=300?'expiring':''}`} role="timer" aria-label={`Automatic logout in ${sessionTime}`}><span>SESSION</span><b>{sessionTime}</b></div><button className="icon-button" aria-label="Search" title="Search" onClick={()=>setToast('Search agents, zones, and dispatches')}><Search size={17} strokeWidth={1.8} aria-hidden="true"/></button><button className="icon-button notification-button" aria-label="Notifications" title="Notifications" onClick={()=>setToast(`${alertRows.length} priority alerts need attention.`)}><Bell size={17} strokeWidth={1.8} aria-hidden="true"/><i/></button><span className="top-avatar">{accountDisplayName(admin.name||admin.email).slice(0,1)}</span><button className="logout-button" onClick={onLogout}>Log out</button></div></header>
+    <main className="main-content"><header className="topbar"><div className="breadcrumb">Network operations <span>/</span> <b>{title}</b></div><div className="top-actions"><div className="live-pill"><i className={connected?'':'offline-dot'}/>{connected?'Systems operational':'Demo data'}</div><div className={`session-timer ${sessionRemaining<=300?'expiring':''}`} role="timer" aria-label={`Automatic logout in ${sessionTime}`}><span>SESSION</span><b>{sessionTime}</b></div><DashboardTopActions admin={admin} onLogout={onLogout} onNavigate={setView} searchItems={searchItems} notifications={notifications}/></div></header>
     {view==='overview'?<section className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="pulse"/>{new Intl.DateTimeFormat('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'}).format(new Date()).toUpperCase()}<span className="heading-dot"> - </span> LIVE NETWORK</div><h1>{greeting} <span className="wave"></span></h1><p>Here's what's happening across your London network today.</p></div><button className="primary-button" onClick={()=>beginDispatch()}><span></span> New dispatch</button></div>
       <div className="metrics-grid"><article className="metric-card"><div className="metric-top">Active agents<span className="metric-symbol green"></span></div><div className="metric-value">{activeAgents} <span className="metric-unit">/ {summary?.agents?.total||260}</span></div><div className="metric-foot"><span className="trend positive"> 4.8 increase</span><span>vs. last week</span><span className="metric-note"><i className="mini-dot"/>{Math.max(0,(summary?.agents?.total||260)-activeAgents)} offline</span></div><div className="metric-progress"><span style={{width:`${Math.min(100,(activeAgents/(summary?.agents?.total||260))*100)}%`}}/></div></article>
         <article className="metric-card"><div className="metric-top">Network liquidity<span className="metric-symbol blue"></span></div><div className="metric-value">{money(liquidity)}<span className="metric-unit"> total</span></div><div className="metric-foot"><span className="trend positive"> 8.2 increase</span><span>vs. last week</span><span className="metric-note">Across 6 zones</span></div><div className="sparkline"><svg viewBox="0 0 180 28" preserveAspectRatio="none"><path d="M0 22C14 21 15 14 30 17S48 24 62 13 82 20 98 10 116 13 129 7 151 15 162 5 173 7 180 2"/><path className="spark-fill" d="M0 22C14 21 15 14 30 17S48 24 62 13 82 20 98 10 116 13 129 7 151 15 162 5 173 7 180 2V28H0Z"/></svg></div></article>
