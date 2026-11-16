@@ -1135,6 +1135,9 @@ export default function App() {
     try {
       const amount = Number(amountAdded);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter a positive replenishment amount.');
+      if (Number.isFinite(task.approvedFloatAmount) && amount > task.approvedFloatAmount) {
+        throw new Error(`Delivered float cannot exceed the admin-approved amount of ${currency(task.approvedFloatAmount)}.`);
+      }
       const collected = Number(salesCollected || 0);
       if (!Number.isFinite(collected) || collected < 0) throw new Error('Enter a valid collected-sales amount.');
       const completed = await api(`/api/dispatches/${task._id}`, {
@@ -1902,6 +1905,7 @@ function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, on
     <View style={styles.row}><Text style={styles.cardTitle}>{task.agent?.name || translate(language, 'Agent needing float')}</Text>
       <Text style={styles.badge}>{translate(language, task.status === 'en_route' ? 'EN ROUTE' : 'ASSIGNED')}</Text></View>
     <Text style={styles.cardSub}>{task.agent?.place || task.agent?.zone || translate(language, 'London')} · {translate(language, 'Current float')} {currency(task.agent?.floatBalance)}</Text>
+    {Number.isFinite(task.approvedFloatAmount) && task.approvedFloatAmount > 0 ? <Text style={styles.cardSub}>{translate(language, 'Admin-approved float amount')}: {currency(task.approvedFloatAmount)}</Text> : null}
     {task.routeDistanceMeters ? <Text style={styles.cardSub}>{translate(language, 'Route to agent')}: {(task.routeDistanceMeters / 1000).toFixed(1)} km{task.routeDurationSeconds ? ` · ${translate(language, 'Estimated travel time')}: ${Math.ceil(task.routeDurationSeconds / 60)} min` : ''}</Text> : null}
     <View style={styles.taskBriefing}><Text style={styles.taskBriefingTitle}>{translate(language, 'Task briefing')}</Text><Text style={styles.taskBriefingText}>{task.instructions || translate(language, 'No special instructions were provided.')}</Text></View>
     {task.alert?.message ? <Text style={styles.help}>{translate(language, 'Agent’s message')}: {task.alert.message}</Text> : null}
@@ -1922,7 +1926,7 @@ function TaskCard({ task, language = 'en', onNavigate, onCall, onSendMessage, on
     </View>
     <Input label={translate(language, 'Ticket sales collected (RWF)')} value={salesCollected} onChangeText={setSalesCollected} placeholder={translate(language, 'Amount collected from sales')} keyboardType="decimal-pad"/>
     <Input label={translate(language, 'Replacement float delivered (RWF)')} value={amountAdded} onChangeText={setAmountAdded} placeholder={translate(language, 'Amount replenished')} keyboardType="decimal-pad"/>
-    <Text style={styles.help}>{translate(language, 'Enter collected ticket sales and replacement float separately. Sales reduce agent POS float; only replacement float actually delivered is credited. Completing the task records both amounts and updates the POS once.')}</Text>
+    <Text style={styles.help}>{translate(language, 'Enter collected ticket sales and replacement float separately. Sales reduce agent POS float; only replacement float actually delivered is credited, up to the admin-approved amount. Completing the task records both amounts and updates the POS once.')}</Text>
     <View style={styles.actionRow}>
       <View style={styles.actionFlex}><ActionButton secondary onPress={onNavigate}>{translate(language, 'Open navigation')}</ActionButton></View>
       {task.agent?.phone ? <View style={styles.actionFlex}><ActionButton secondary onPress={onCall}>{translate(language, 'Call agent')}</ActionButton></View> : null}

@@ -128,10 +128,10 @@ Commuters create an account in the mobile app and then see the live agent map ce
 | POST | `/api/superagent/agents/:id/deletion-requests` | Ask an administrator to approve deletion of an assigned agent |
 | DELETE | `/api/superagent/agents/:id` | Archive an assigned agent only after administrator approval; disables login and retains financial history |
 | GET | `/api/dispatch-options?agentId=…` or `?alertId=…` | Find available distributors within 500 m, preferring the agent's zone and ranking by route ETA |
-| POST | `/api/alerts/:id/dispatch` | Assign a selected or best-matched available distributor; optional `instructions` are sent with the task |
-| POST | `/api/admin/agents/:id/dispatch` | Create or reuse an agent support alert and assign a selected or best-matched distributor |
+| POST | `/api/alerts/:id/dispatch` | Assign a selected or best-matched available distributor; requires a positive `approvedFloatAmount` and can include `instructions` |
+| POST | `/api/admin/agents/:id/dispatch` | Create or reuse an agent support alert and assign a distributor with a required `approvedFloatAmount` |
 | GET | `/api/dispatches` | Active assignments; `?status=completed` returns the 50 most recent completions with sales collected, replacement float delivered, and resulting POS balance |
-| PATCH | `/api/dispatches/:id` | Assigned distributor updates task status or completes it with `salesCollected` and `amountAdded`; POS is reduced by sales collected and credited only with replacement float delivered |
+| PATCH | `/api/dispatches/:id` | Assigned distributor completes a task with `salesCollected` and actual `amountAdded`; actual delivery (up to `approvedFloatAmount`) reduces POS by sales collected, credits delivered float, and resolves the alert |
 | POST | `/api/dispatches/:id/messages` | Send a message in an active dispatch conversation (admin or assigned distributor) |
 | GET | `/api/transactions?hours=24` | Recent ticket and float transactions |
 | GET | `/api/liquidity/heatmap?hours=24` | Agent liquidity and activity points |

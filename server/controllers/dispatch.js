@@ -5,6 +5,7 @@ app.post('/api/admin/agents/:id/dispatch', async (req, res) => {
     const instructions = normalizeDispatchInstructions(req.body?.instructions) ||
       'Please transfer float to this agent and record the amount delivered in the app.';
     const distributorId = normalizeDispatchDistributorId(req.body?.distributorId);
+    const approvedFloatAmount = normalizeApprovedFloatAmount(req.body?.approvedFloatAmount);
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Agent not found.' });
     const agent = await Agent.findOne({ _id: req.params.id, archivedAt: null });
     if (!agent) return res.status(404).json({ error: 'Agent not found.' });
@@ -12,7 +13,7 @@ app.post('/api/admin/agents/:id/dispatch', async (req, res) => {
 
     const alert = await Alert.findOne({ agent: agent._id, state: { $in: ['open', 'dispatched'] } }) ||
       await triggerSos(agent, 'Manual dispatch requested by an administrator.');
-    const dispatch = await assignNearestDistributor(alert._id, instructions, distributorId);
+    const dispatch = await assignNearestDistributor(alert._id, instructions, distributorId, approvedFloatAmount);
     if (!dispatch) { const error = new Error('No dispatch assignment was created for this alert.'); error.status = 409; throw error; }
     broadcast('dispatch:created', dispatch);
     res.status(201).json(dispatch);
@@ -379,11 +380,26 @@ function normalizeDispatchDistributorId(value) {
   return value;
 }
 
-async function assignNearestDistributor(alertId, instructions = '', selectedDistributorId = '') {
+function normalizeApprovedFloatAmount(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 ||
+    Math.round(value * 100) / 100 !== value) {
+    const error = new Error('Enter a positive approved float amount with no more than two decimal places.');
+    error.status = 400;
+    throw error;
+  }
+  return value;
+}
+
+async function assignNearestDistributor(alertId, instructions = '', selectedDistributorId = '', approvedFloatAmount) {
   const initialAlert=await Alert.findById(alertId);
   if(!initialAlert){const error=new Error('Alert not found.');error.status=404;throw error}
   if(initialAlert.state==='dispatched') {
     let dispatch = await Dispatch.findOne({alert:initialAlert._id});
+    if (dispatch && dispatch.approvedFloatAmount !== approvedFloatAmount) {
+      const error = new Error('This alert already has a dispatch with a different approved float amount.');
+      error.status = 409;
+      throw error;
+    }
     if (selectedDistributorId && dispatch && String(dispatch.distributor) !== String(selectedDistributorId)) {
       const error = new Error('This alert already has a distributor assigned.');
       error.status = 409;
@@ -423,6 +439,11 @@ async function assignNearestDistributor(alertId, instructions = '', selectedDist
           err.status = 409;
           throw err;
         }
+        if (result && result.approvedFloatAmount !== approvedFloatAmount) {
+          const err = new Error('This alert already has a dispatch with a different approved float amount.');
+          err.status = 409;
+          throw err;
+        }
         if (result && instructions) { result.instructions=instructions; await result.save({session}); }
         if (result) await result.populate([{path:'agent',select:'name place zone location'},{path:'distributor',select:'name phone location'},{path:'alert',select:'message'}]);
         return;
@@ -443,9 +464,10 @@ async function assignNearestDistributor(alertId, instructions = '', selectedDist
         err.status = 409;
         throw err;
       }
-      const taskInstructions=instructions||`URGENT float transfer for ${agent.name||'the agent'}${agent.place||agent.zone?` (${agent.place||agent.zone})`:''}. Please contact the agent now, confirm the amount needed, arrange the transfer as soon as possible, and record the actual amount delivered in the app.`;
+      const taskInstructions=instructions||`URGENT float transfer for ${agent.name||'the agent'}${agent.place||agent.zone?` (${agent.place||agent.zone})`:''}. Deliver no more than the admin-approved amount and record the actual amount delivered in the app.`;
       const [dispatch] = await Dispatch.create([{
         alert: alert._id, agent: alert.agent, distributor: distributor._id,
+        approvedFloatAmount,
         instructions:taskInstructions,
         messages:[{sender:'admin',senderName:'Operations',text:taskInstructions}],
         status: 'en_route', distanceMeters: haversineMeters(currentLocation.coordinates, distributor.location.coordinates),
@@ -454,7 +476,7 @@ async function assignNearestDistributor(alertId, instructions = '', selectedDist
       newlyAssigned=true;
       distributor.status = 'busy';distributor.duty_state='active';distributor.assigned_tasks.push(dispatch._id); await distributor.save({ session });
       alert.location=currentLocation;alert.state = 'dispatched';alert.assigned_distributor_id=distributor.distributor_id||String(distributor._id); await alert.save({ session });
-      await OperationalEvent.create([{event_id:crypto.randomUUID(),action_type:'dispatch_assigned',actor_id:String(distributor._id),metadata:{dispatchId:String(dispatch._id),alertId:String(alert._id),agentId:String(alert.agent),distanceMeters:dispatch.distanceMeters}}],{session});
+      await OperationalEvent.create([{event_id:crypto.randomUUID(),action_type:'dispatch_assigned',actor_id:String(distributor._id),metadata:{dispatchId:String(dispatch._id),alertId:String(alert._id),agentId:String(alert.agent),distanceMeters:dispatch.distanceMeters,approved_float_amount:approvedFloatAmount}}],{session});
       result = await dispatch.populate([{ path: 'agent', select: 'name place zone location' }, { path: 'distributor', select: 'name phone location' }, { path: 'alert', select: 'message' }]);
     });
     if(result && result.distributor?.location?.coordinates && result.agent?.location?.coordinates){const route=await getRoute(result.distributor.location.coordinates,result.agent.location.coordinates);await Dispatch.findByIdAndUpdate(result._id,{$set:{routeCoordinates:route.coordinates,routeDistanceMeters:route.distanceMeters,routeDurationSeconds:route.durationSeconds,routeSource:route.source}});result=await Dispatch.findById(result._id).populate([{path:'agent',select:'name place zone location'},{path:'distributor',select:'name phone location'},{path:'alert',select:'message'}]);}
@@ -567,7 +589,7 @@ app.get('/api/dispatch-options', async (req, res) => {
 });
 
 app.post('/api/alerts/:id/dispatch', async (req, res) => {
-  try{const instructions=normalizeDispatchInstructions(req.body?.instructions);const distributorId=normalizeDispatchDistributorId(req.body?.distributorId);const dispatch=await assignNearestDistributor(req.params.id,instructions,distributorId);broadcast('dispatch:created',dispatch);res.status(201).json(dispatch)}
+  try{const instructions=normalizeDispatchInstructions(req.body?.instructions);const distributorId=normalizeDispatchDistributorId(req.body?.distributorId);const approvedFloatAmount=normalizeApprovedFloatAmount(req.body?.approvedFloatAmount);const dispatch=await assignNearestDistributor(req.params.id,instructions,distributorId,approvedFloatAmount);broadcast('dispatch:created',dispatch);res.status(201).json(dispatch)}
   catch(error){apiError(res,error)}
 });
 
@@ -602,6 +624,7 @@ app.patch('/api/dispatches/:id', async (req, res) => {
       if(!dispatch){const error=new Error('Dispatch not found.');error.status=404;throw error}
       if(String(dispatch.distributor)!==String(req.mobile.account.distributor)){const error=new Error('This dispatch is assigned to another distributor.');error.status=403;throw error}
       if(!['assigned','en_route'].includes(dispatch.status)){const error=new Error('Dispatch is no longer active.');error.status=409;throw error}
+      if(req.body.status==='completed'&&Number.isFinite(dispatch.approvedFloatAmount)&&req.body.amountAdded>dispatch.approvedFloatAmount){const error=new Error('Delivered float cannot exceed the admin-approved amount.');error.status=409;throw error}
       dispatch.status=req.body.status;if(req.body.status==='completed'){dispatch.completedAt=new Date();dispatch.salesCollected=salesCollected;dispatch.amountAdded=req.body.amountAdded}await dispatch.save({session});
       if(['completed','cancelled'].includes(req.body.status)){
         const distributor=await Distributor.findById(dispatch.distributor).session(session);
@@ -617,7 +640,7 @@ app.patch('/api/dispatches/:id', async (req, res) => {
           if (salesCollected > 0) await Transaction.create([{agent:agent._id,amount:salesCollected,kind:'ticket_sale',location:agent.location}],{session});
           await Transaction.create([{agent:agent._id,amount:req.body.amountAdded,kind:'float_top_up',location:agent.location}],{session});
           await Alert.findByIdAndUpdate(dispatch.alert,{$set:{state:'resolved',resolvedAt:new Date(),resolved_status:true}},{session});
-          await OperationalEvent.create([{event_id:crypto.randomUUID(),action_type:'replenish',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id),agentId:String(agent._id),amount_added:req.body.amountAdded,sales_collected:salesCollected,previous_float:previous}},{event_id:crypto.randomUUID(),action_type:'dispatch_completed',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id)}}],{session});
+          await OperationalEvent.create([{event_id:crypto.randomUUID(),action_type:'replenish',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id),agentId:String(agent._id),approved_float_amount:dispatch.approvedFloatAmount,amount_added:req.body.amountAdded,sales_collected:salesCollected,previous_float:previous}},{event_id:crypto.randomUUID(),action_type:'dispatch_completed',actor_id:String(dispatch.distributor),metadata:{dispatchId:String(dispatch._id),approved_float_amount:dispatch.approvedFloatAmount,amount_added:req.body.amountAdded}}],{session});
         }
       }
       result=await dispatch.populate([{path:'agent',select:'name place zone location floatBalance'},{path:'distributor',select:'name location'}]);
