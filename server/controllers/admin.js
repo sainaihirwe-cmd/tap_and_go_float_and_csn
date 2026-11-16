@@ -225,8 +225,8 @@ function adminProfileInput(body = {}, role) {
     }
     updates.location = location;
   }
-  if (role === 'agent') updates.zone = zone;
-  else updates.full_name = name;
+  updates.zone = zone;
+  if (role === 'distributor') updates.full_name = name;
   return updates;
 }
 
