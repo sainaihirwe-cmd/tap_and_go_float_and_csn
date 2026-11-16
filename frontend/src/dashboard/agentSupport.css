@@ -49,6 +49,69 @@
   font-size: 9px;
 }
 
+.superagent-deletion-table {
+  min-width: 1000px;
+}
+
+.superagent-deletion-table th {
+  padding: 8px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.superagent-deletion-table td {
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  vertical-align: top;
+}
+
+.superagent-deletion-table td small {
+  display: block;
+  margin-top: 3px;
+  color: #89938a;
+  font-size: 9px;
+}
+
+.deletion-request-reason,
+.deletion-request-response {
+  min-width: 160px;
+  max-width: 250px;
+  overflow-wrap: anywhere;
+}
+
+.deletion-review-actions {
+  display: grid;
+  min-width: 160px;
+  gap: 6px;
+}
+
+.deletion-review-actions textarea {
+  min-height: 44px;
+  resize: vertical;
+  border: 1px solid #e5eae4;
+  border-radius: 6px;
+  padding: 6px;
+  font: inherit;
+  font-size: 9px;
+}
+
+.deletion-review-actions > div {
+  display: flex;
+  gap: 6px;
+}
+
+.deletion-review-actions .row-action {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.deletion-review-complete {
+  color: #69756c;
+  font-size: 9px;
+}
+
 @media (max-width: 560px) {
   .agent-support-table {
     min-width: 700px;

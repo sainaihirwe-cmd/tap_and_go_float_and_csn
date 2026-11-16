@@ -854,18 +854,21 @@ function SuperagentDeletionRequests({requests,onRefresh,onMessage}){
   }catch(error){onMessage(error.message)}finally{setBusyId('')}
  };
  return <section className="panel superagent-requests-panel">
-  <div className="panel-heading"><div><h2>Agent deletion requests</h2><p>Review the Superagent's reason. Approval gives that Superagent permission to archive the agent; the agent remains active until the Superagent confirms deletion.</p></div><span className="table-status warning">{requests.filter(request=>request.status==='pending').length} pending</span></div>
-  {requests.map(request=><article className="superagent-request-card" key={request._id}>
-   <header><div><b>{request.agent?.name||'Agent profile'}</b><small>{request.agent?.agent_id||'-'}  -  Requested by {request.superagent?.name||request.superagent?.email||'Superagent'}</small></div><span className={`table-status ${request.status==='pending'?'warning':request.status==='approved'?'healthy':'critical'}`}>{request.status}</span></header>
-   <p><b>Reason:</b> {request.reason}</p>
-   {request.reviewNote&&<p><b>Admin response:</b> {request.reviewNote}</p>}
-   <small>{request.createdAt?new Date(request.createdAt).toLocaleString('en-GB'):''}</small>
-   {request.status==='pending'&&<div className="superagent-review-actions">
-    <label>Rejection reason (required to reject)<textarea maxLength="500" value={notes[request._id]||''} onChange={event=>setNotes(current=>({...current,[request._id]:event.target.value}))} placeholder="Explain why this agent should remain active."/></label>
-    <div><button className="row-action reject-action" disabled={busyId===request._id||!notes[request._id]?.trim()} onClick={()=>review(request,'rejected')}>{busyId===request._id?'Saving...':'Reject request'}</button><button className="row-action" disabled={busyId===request._id} onClick={()=>review(request,'approved')}>{busyId===request._id?'Saving...':'Approve deletion'}</button></div>
-   </div>}
-  </article>)}
-  {!requests.length&&<p className="empty-table">No Superagent deletion requests yet.</p>}
+  <div className="panel-heading"><div><h2>Agent deletion requests</h2><p>Review each request. Approval enables the Superagent to delete the agent; rejection includes your reason.</p></div><span className="table-status warning">{requests.filter(request=>request.status==='pending').length} pending</span></div>
+  {requests.length?<div className="table-scroll"><table className="superagent-deletion-table" aria-live="polite"><thead><tr><th>AGENT</th><th>SUPERAGENT</th><th>REQUEST REASON</th><th>REQUESTED</th><th>STATUS</th><th>ADMIN RESPONSE</th><th>REVIEW</th></tr></thead><tbody>
+   {requests.map(request=><tr key={request._id}>
+    <td><b>{request.agent?.name||'Agent profile'}</b><small>{request.agent?.agent_id||'-'}</small></td>
+    <td>{request.superagent?.name||request.superagent?.email||'Superagent'}</td>
+    <td className="deletion-request-reason">{request.reason}</td>
+    <td>{request.createdAt?new Date(request.createdAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'}</td>
+    <td><span className={`table-status ${request.status==='pending'?'warning':request.status==='approved'?'healthy':'critical'}`}>{request.status}</span></td>
+    <td className="deletion-request-response">{request.reviewNote||'-'}</td>
+    <td>{request.status==='pending'?<div className="deletion-review-actions">
+     <textarea aria-label={`Reason for rejecting ${request.agent?.name||'agent'}`} maxLength={500} value={notes[request._id]||''} onChange={event=>setNotes(current=>({...current,[request._id]:event.target.value}))} placeholder="Reason required to reject"/>
+     <div><button className="row-action" type="button" disabled={busyId===request._id} onClick={()=>review(request,'approved')}>{busyId===request._id?'Saving...':'Accept'}</button><button className="row-action reject-action" type="button" disabled={busyId===request._id||!notes[request._id]?.trim()} onClick={()=>review(request,'rejected')}>{busyId===request._id?'Saving...':'Reject'}</button></div>
+    </div>:<span className="deletion-review-complete">{request.status==='approved'?'Superagent can delete':'Deletion disabled'}</span>}</td>
+   </tr>)}
+  </tbody></table></div>:<p className="empty-table">No Superagent deletion requests yet. New requests will appear here automatically.</p>}
  </section>
 }
 
