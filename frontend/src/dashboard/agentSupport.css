@@ -112,6 +112,30 @@
   font-size: 9px;
 }
 
+.superagent-deletion-page .page-heading h1 {
+  font-size: 20px;
+}
+
+.superagent-deletion-page .page-heading p {
+  font-size: 9px;
+}
+
+.superagent-deletion-page .superagent-requests-panel > .panel-heading h2 {
+  font-size: 11px;
+}
+
+.superagent-deletion-page .superagent-requests-panel > .panel-heading p {
+  font-size: 9px;
+}
+
+.superagent-deletion-page .superagent-requests-panel > .panel-heading .table-status {
+  font-size: 9px;
+}
+
+.superagent-deletion-page .superagent-requests-panel > .empty-table {
+  font-size: 12px;
+}
+
 @media (max-width: 560px) {
   .agent-support-table {
     min-width: 700px;
