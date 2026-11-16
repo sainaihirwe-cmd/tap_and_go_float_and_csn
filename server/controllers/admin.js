@@ -306,6 +306,40 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
   try {
     const { email } = mobileCredentialsInput(req.body);
     const updates = adminProfileInput(req.body, 'agent');
+    const [adminExists, commuterExists, existingAccount] = await Promise.all([
+      AdminProfile.exists({ email }),
+      CommuterAccount.exists({ email }),
+      MobileAccount.findOne({ email }).select('+inviteTokenHash')
+    ]);
+    if (adminExists || commuterExists) return res.status(409).json({ error: 'This email address is already in use by another account.' });
+    if (existingAccount) {
+      if (existingAccount.role !== 'agent' || !existingAccount.agent) {
+        return res.status(409).json({ error: 'This email address is already linked to another mobile account.' });
+      }
+      const existingAgent = await Agent.findOne({ _id: existingAccount.agent, archivedAt: null });
+      if (!existingAgent || !existingAccount.active) {
+        return res.status(409).json({ error: 'An inactive or archived Agent account already uses this email. Review the existing account in Settings.' });
+      }
+      if (existingAccount.setupPending) {
+        ensureInvitationConfigured();
+        const invite = createInvitationToken();
+        existingAccount.inviteTokenHash = invite.tokenHash;
+        existingAccount.inviteExpiresAt = invite.expiresAt;
+        await existingAccount.save();
+        try {
+          await sendStaffInvitation({ email, name: existingAgent.name, role: 'agent', token: invite.token });
+        } catch (error) {
+          console.error('Unable to resend the existing agent invitation:', error.message);
+          return res.status(502).json({ error: `The Agent already exists, but its setup email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(existingAccount._id) });
+        }
+      }
+      return res.status(200).json({
+        profile: existingAgent,
+        account: { id: String(existingAccount._id), role: existingAccount.role, email: existingAccount.email, active: existingAccount.active },
+        existing: true,
+        setupLinkResent: Boolean(existingAccount.setupPending)
+      });
+    }
     const superagentId = String(req.body?.superagentId || '');
     if (superagentId && !mongoose.isValidObjectId(superagentId)) return res.status(400).json({ error: 'Choose a valid active Superagent.' });
     const openingFloat = Number(req.body?.openingFloat ?? 0);
