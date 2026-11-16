@@ -1728,9 +1728,7 @@ function SuperagentDashboard({ language, activeTab, onMessage }) {
               ? <View style={styles.actionFlex}><ActionButton secondary disabled>{translate(language, 'Deletion request pending')}</ActionButton></View>
               : deletionRequest?.status === 'approved'
                 ? <View style={styles.actionFlex}><ActionButton onPress={() => { setConfirmingDeletionId(agent._id); setDeletionError(''); }} disabled={saving}>{translate(language, 'Delete agent')}</ActionButton></View>
-                : deletionRequest?.status === 'rejected'
-                  ? <View style={styles.actionFlex}><ActionButton secondary disabled>{translate(language, 'Deletion rejected')}</ActionButton></View>
-                  : <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setRequestingId(agent._id); setReason(''); setError(''); }}>{translate(language, 'Request deletion')}</ActionButton></View>}
+                : <View style={styles.actionFlex}><ActionButton secondary onPress={() => { setRequestingId(agent._id); setReason(''); setError(''); }}>{translate(language, 'Request deletion')}</ActionButton></View>}
           </View>
           {confirmingDeletionId === agent._id && <View style={styles.requestReasonBox}>
             <Text style={styles.help}>{translate(language, 'Delete {name}? This archives the agent, disables their login, and retains financial history.').replace('{name}', agent.name)}</Text>
