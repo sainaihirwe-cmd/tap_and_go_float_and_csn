@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 function createInvitationToken() {
   const token = crypto.randomBytes(32).toString('hex');
@@ -46,7 +47,6 @@ async function sendStaffPasswordReset({ email, name, role, token }) {
 
 async function sendStaffAccessEmail({ email, name, role, token, mode, subject, description, action }) {
   ensureInvitationConfigured();
-  const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
   const setupUrl = `${frontendUrl}/#setupToken=${encodeURIComponent(token)}&mode=${mode}`;
@@ -55,24 +55,19 @@ async function sendStaffAccessEmail({ email, name, role, token, mode, subject, d
   const safeSetupUrl = escapeHtml(setupUrl);
   const safeDescription = escapeHtml(description);
   const safeAction = escapeHtml(action);
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from,
-      to: [email],
-      subject,
-      text: `Hello ${name || role},\n\n${description}\n\n${setupUrl}\n\nThis one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with ${email}. For your security, we never send passwords by email.\n\nIf you were not expecting this email, contact your administrator.`,
-      html: `<p>Hello ${safeName},</p><p>${safeDescription}</p><p><strong>Login email:</strong> ${safeEmail}</p><p><a href="${safeSetupUrl}">${safeAction}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap &amp; Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`
-    })
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.resend.com',
+    port: 465,
+    secure: true,
+    auth: { user: 'resend', pass: process.env.RESEND_API_KEY }
   });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Invitation email delivery failed (HTTP ${response.status}): ${body.slice(0, 500)}`);
-  }
+  await transporter.sendMail({
+    from,
+    to: email,
+    subject,
+    text: `Hello ${name || role},\n\n${description}\n\n${setupUrl}\n\nThis one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with ${email}. For your security, we never send passwords by email.\n\nIf you were not expecting this email, contact your administrator.`,
+    html: `<p>Hello ${safeName},</p><p>${safeDescription}</p><p><strong>Login email:</strong> ${safeEmail}</p><p><a href="${safeSetupUrl}">${safeAction}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap &amp; Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`
+  });
 }
 
 function escapeHtml(value) {

@@ -23,7 +23,6 @@ app.get('/api/admin/mobile-accounts', requireAdmin, async (_req, res) => {
   } catch (error) { apiError(res, error); }
 });
 app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
-  let session;
   try {
     const role = req.body?.role;
     const email = String(req.body?.email || '').trim().toLowerCase();
@@ -70,29 +69,22 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
     const Model = role === 'agent' ? Agent : Distributor;
     const invite = createInvitationToken();
     const passwordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
-    session = await mongoose.startSession();
-    let account;
-    let profileName;
-    await session.withTransaction(async () => {
-      const record = await Model.findById(recordId).select('_id name').session(session);
-      if (!record) {
-        const error = new Error('The selected profile was not found.');
-        error.status = 404;
-        throw error;
-      }
-      profileName = record.name;
-      [account] = await MobileAccount.create([{
-        role,
-        [role]: record._id,
-        email,
-        passwordHash,
-        inviteTokenHash: invite.tokenHash,
-        inviteExpiresAt: invite.expiresAt,
-        setupPending: true
-      }], { session });
+    const record = await Model.findById(recordId).select('_id name');
+    if (!record) {
+      const error = new Error('The selected profile was not found.');
+      error.status = 404;
+      throw error;
+    }
+    const profileName = record.name;
+    const account = await MobileAccount.create({
+      role,
+      [role]: record._id,
+      email,
+      passwordHash,
+      inviteTokenHash: invite.tokenHash,
+      inviteExpiresAt: invite.expiresAt,
+      setupPending: true
     });
-    await session.endSession();
-    session = null;
     try {
       await sendStaffInvitation({ email, name: profileName, role, token: invite.token });
     } catch (error) {
@@ -101,7 +93,6 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
     }
     res.status(201).json({ id: String(account._id), role: account.role, email: account.email, active: account.active });
   } catch (error) { apiError(res, error); }
-  finally { if (session) await session.endSession(); }
 });
 app.post('/api/admin/mobile-accounts/:id/invitation', requireAdmin, async (req, res) => {
   try {
@@ -302,7 +293,6 @@ function mobileCredentialsInput(body = {}) {
 }
 
 app.post('/api/admin/agents', requireAdmin, async (req, res) => {
-  let session;
   try {
     const { email } = mobileCredentialsInput(req.body);
     const updates = adminProfileInput(req.body, 'agent');
@@ -347,11 +337,12 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
     ensureInvitationConfigured();
     const invite = createInvitationToken();
     const passwordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
-    session = await mongoose.startSession();
-    let result;
-    await session.withTransaction(async () => {
+    let agent;
+    let account;
+    let transaction;
+    try {
       const now = new Date();
-      const [agent] = await Agent.create([{
+      agent = await Agent.create({
         ...updates,
         agent_id: crypto.randomUUID(),
         agentType: 'mobile',
@@ -363,22 +354,21 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
         status: openingFloat <= Math.max(sosThreshold, 10000, openingFloat * 0.1) ? 'at_risk' : 'active',
         lastSeenAt: now,
         last_updated: now
-      }], { session });
-      const [account] = await MobileAccount.create([{
+      });
+      account = await MobileAccount.create({
         role: 'agent', agent: agent._id, email, passwordHash,
         inviteTokenHash: invite.tokenHash, inviteExpiresAt: invite.expiresAt, setupPending: true
-      }], { session });
+      });
       if (openingFloat > 0) {
-        await Transaction.create([{
+        transaction = await Transaction.create({
           agent: agent._id, amount: openingFloat, kind: 'float_top_up',
           ...(agent.location ? { location: agent.location } : {})
-        }], { session });
+        });
       }
       if (superagentId) {
         const assignment = await MobileAccount.updateOne(
           { _id: superagentId, role: 'superagent', active: true },
-          { $addToSet: { managedAgents: agent._id } },
-          { session }
+          { $addToSet: { managedAgents: agent._id } }
         );
         if (assignment.matchedCount !== 1) {
           const error = new Error('The selected Superagent is no longer active. Refresh the form and try again.');
@@ -386,75 +376,97 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
           throw error;
         }
       }
-      result = { agent, account };
-    });
-    await session.endSession();
-    session = null;
+    } catch (error) {
+      const cleanupErrors = [];
+      if (superagentId && agent) {
+        try {
+          await MobileAccount.updateOne({ _id: superagentId, role: 'superagent' }, { $pull: { managedAgents: agent._id } });
+        } catch (cleanupError) { cleanupErrors.push(cleanupError); }
+      }
+      if (transaction) {
+        try { await Transaction.deleteOne({ _id: transaction._id }); }
+        catch (cleanupError) { cleanupErrors.push(cleanupError); }
+      }
+      if (account) {
+        try { await MobileAccount.deleteOne({ _id: account._id }); }
+        catch (cleanupError) { cleanupErrors.push(cleanupError); }
+      }
+      if (agent) {
+        try { await Agent.deleteOne({ _id: agent._id }); }
+        catch (cleanupError) { cleanupErrors.push(cleanupError); }
+      }
+      if (cleanupErrors.length) console.error('Agent creation rollback was incomplete:', cleanupErrors);
+      throw error;
+    }
     try {
-      await sendStaffInvitation({ email, name: result.agent.name, role: 'agent', token: invite.token });
+      await sendStaffInvitation({ email, name: agent.name, role: 'agent', token: invite.token });
     } catch (error) {
       console.error('Unable to deliver agent invitation:', error.message);
-      return res.status(502).json({ error: `The agent and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(result.account._id) });
+      return res.status(502).json({ error: `The agent and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(account._id) });
     }
-    broadcast('agent:telemetry', result.agent);
+    broadcast('agent:telemetry', agent);
     let warning;
-    if (result.agent.floatBalance <= lowFloatThreshold(result.agent)) {
+    if (agent.floatBalance <= lowFloatThreshold(agent)) {
       try {
-        await notifyLowFloat(result.agent);
+        await notifyLowFloat(agent);
       } catch (error) {
         console.error('Agent and login were created, but the low-float alert could not be recorded:', error);
         warning = 'The Agent and login were created, but the low-float alert could not be recorded. Review the alert queue.';
       }
     }
     res.status(201).json({
-      profile: result.agent,
-      account: { id: String(result.account._id), role: result.account.role, email: result.account.email, active: result.account.active },
+      profile: agent,
+      account: { id: String(account._id), role: account.role, email: account.email, active: account.active },
       ...(warning ? { warning } : {})
     });
   } catch (error) { apiError(res, error); }
-  finally { if (session) await session.endSession(); }
 });
 
 app.post('/api/admin/distributors', requireAdmin, async (req, res) => {
-  let session;
   try {
     const { email } = mobileCredentialsInput(req.body);
     const updates = adminProfileInput(req.body, 'distributor');
     ensureInvitationConfigured();
     const invite = createInvitationToken();
     const passwordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
-    session = await mongoose.startSession();
-    let result;
-    await session.withTransaction(async () => {
-      const [distributor] = await Distributor.create([{
+    let distributor;
+    let account;
+    try {
+      distributor = await Distributor.create({
         ...updates,
         distributor_id: crypto.randomUUID(),
         ...(updates.location ? { live_location: updates.location } : {}),
         status: 'offline',
         duty_state: 'inactive',
         lastSeenAt: new Date()
-      }], { session });
-      const [account] = await MobileAccount.create([{
+      });
+      account = await MobileAccount.create({
         role: 'distributor', distributor: distributor._id, email, passwordHash,
         inviteTokenHash: invite.tokenHash, inviteExpiresAt: invite.expiresAt, setupPending: true
-      }], { session });
-      result = { distributor, account };
-    });
-    await session.endSession();
-    session = null;
+      });
+    } catch (error) {
+      if (account) {
+        try { await MobileAccount.deleteOne({ _id: account._id }); }
+        catch (cleanupError) { console.error('Distributor creation rollback could not remove the account:', cleanupError); }
+      }
+      if (distributor) {
+        try { await Distributor.deleteOne({ _id: distributor._id }); }
+        catch (cleanupError) { console.error('Distributor creation rollback could not remove the profile:', cleanupError); }
+      }
+      throw error;
+    }
     try {
-      await sendStaffInvitation({ email, name: result.distributor.name, role: 'distributor', token: invite.token });
+      await sendStaffInvitation({ email, name: distributor.name, role: 'distributor', token: invite.token });
     } catch (error) {
       console.error('Unable to deliver distributor invitation:', error.message);
-      return res.status(502).json({ error: `The distributor and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(result.account._id) });
+      return res.status(502).json({ error: `The distributor and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(account._id) });
     }
-    broadcast('distributor:location', result.distributor);
+    broadcast('distributor:location', distributor);
     res.status(201).json({
-      profile: result.distributor,
-      account: { id: String(result.account._id), role: result.account.role, email: result.account.email, active: result.account.active }
+      profile: distributor,
+      account: { id: String(account._id), role: account.role, email: account.email, active: account.active }
     });
   } catch (error) { apiError(res, error); }
-  finally { if (session) await session.endSession(); }
 });
 
 app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req, res) => {
