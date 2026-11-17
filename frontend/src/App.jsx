@@ -500,10 +500,17 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
    const response=await apiFetch('/api/admin/mobile-accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
    const result=await response.json();
    if(!response.ok){
-    if(result.accountCreated)await refresh();
+    if(result.accountCreated){
+     setEmail('');setSuperagentName('');setManagedAgentIds([]);
+     onMessage(result.error||'The account was created, but its invitation could not be sent.');
+     try{await refresh()}catch(problem){setError(`The account was created, but the account list could not be refreshed: ${problem.message}`)}
+     return;
+    }
     throw Error(result.error||'Unable to create mobile account.');
    }
-   setEmail('');setSuperagentName('');setManagedAgentIds([]);await refresh();onMessage(`Account created. A secure setup link was emailed to ${result.email}.`);
+   setEmail('');setSuperagentName('');setManagedAgentIds([]);
+   onMessage(`Account created. A secure setup link was emailed to ${result.email}.`);
+   try{await refresh()}catch(problem){setError(`The account was created, but the account list could not be refreshed: ${problem.message}`)}
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
  const resendInvitation=async account=>{
