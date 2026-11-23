@@ -99,7 +99,7 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
     await refresh();onMessage(result.setupPending?`A new setup link was emailed to ${result.email}.`:`A password reset link was emailed to ${result.email}.`);
    }catch(problem){setError(problem.message)}finally{setBusy(false)}
   };
-  const setPassword=async account=>{
+  const setPasswordDirect=async account=>{
    const newPassword=window.prompt(`Set new password for ${account.email} (min 12 chars):`);
    if(!newPassword||newPassword.length<12){if(newPassword!==null)alert('Password must be at least 12 characters.');return;}
    setError('');setBusy(true);
@@ -179,7 +179,7 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
        :<p>No agents assigned yet.</p>}
       <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope({accountId:account.id,ids:(account.managedAgents||[]).map(item=>String(item._id||item))})}>Edit assignments</button>
      </>}
-    </details></td><td>{account.setupPending?'Pending setup':account.active?'Active':'Disabled'}</td><td className="mobile-account-table-actions"><div className="mobile-account-action-grid">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password via email</button>}<button className="subtle-button" disabled={busy||!account.active} onClick={()=>setPassword(account)}>Set password</button><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button><details className="superagent-scope mobile-account-edit-details"><summary>Edit details</summary>
+    </details></td><td>{account.setupPending?'Pending setup':account.active?'Active':'Disabled'}</td><td className="mobile-account-table-actions"><div className="mobile-account-action-grid">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password via email</button>}<button className="subtle-button" disabled={busy||!account.active} onClick={()=>setPasswordDirect(account)}>Set password</button><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button><details className="superagent-scope mobile-account-edit-details"><summary>Edit details</summary>
      {editingSuperagent?.accountId===account.id?<div className="profile-form">
       <label>Name</label><input maxLength="80" value={editingSuperagent.name} onChange={event=>setEditingSuperagent(current=>({...current,name:event.target.value}))}/>
       <label>Sign-in email</label><input type="email" maxLength="254" value={editingSuperagent.email} onChange={event=>setEditingSuperagent(current=>({...current,email:event.target.value}))}/>
@@ -215,7 +215,7 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
        :<p>No agents assigned yet.</p>}
       <button className="row-action" type="button" disabled={busy} onClick={()=>setEditingScope({accountId:account.id,ids:(account.managedAgents||[]).map(item=>String(item._id||item))})}>Edit assignments</button>
      </>}
-    </details>}</div><div className="mobile-account-actions">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password via email</button>}<button className="subtle-button" disabled={busy||!account.active} onClick={()=>setPassword(account)}>Set password</button><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>}
+    </details>}</div><div className="mobile-account-actions">{account.setupPending?<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resendInvitation(account)}>Resend setup link</button>:<button className="subtle-button" disabled={busy||!account.active} onClick={()=>resetPassword(account)}>Reset password via email</button>}<button className="subtle-button" disabled={busy||!account.active} onClick={()=>setPasswordDirect(account)}>Set password</button><button className="subtle-button" onClick={()=>toggle(account)}>{account.active?'Disable':'Enable'}</button>{account.role==='superagent'&&<button className="subtle-button" disabled={busy} onClick={()=>removeSuperagent(account)}>Delete</button>}</div></div>):<p className="mobile-account-empty">No mobile accounts have been created yet.</p>}</div>}
   </section>
 }
 
