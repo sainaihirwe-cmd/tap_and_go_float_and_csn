@@ -85,7 +85,7 @@ function escapeHtml(value) {
     .replace(/&/g, "&")
     .replace(/</g, "<")
     .replace(/>/g, ">")
-    .replace(/"/g, """)
+    .replace(/"/g, '\\"')
     .replace(/'/g, "'");
 }
 
