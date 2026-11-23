@@ -23,9 +23,9 @@ services:
         value: TapGoDev2026!
       - key: AUTH_SECRET
         generateValue: true
-      - key: RESEND_API_KEY
+      - key: EMAIL_USER
         sync: false
-      - key: EMAIL_FROM
+      - key: EMAIL_PASS
         sync: false
 
   - type: static

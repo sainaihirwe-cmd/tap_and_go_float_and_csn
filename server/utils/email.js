@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 function createInvitationToken() {
   const token = crypto.randomBytes(32).toString('hex');
@@ -10,11 +11,35 @@ function createInvitationToken() {
 }
 
 function ensureInvitationConfigured() {
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM || !process.env.FRONTEND_URL) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !process.env.FRONTEND_URL) {
     throw Object.assign(
-      new Error('Email invitations are not configured. Set RESEND_API_KEY, EMAIL_FROM, and FRONTEND_URL on the backend.'),
+      new Error('Email invitations are not configured. Set EMAIL_USER, EMAIL_PASS, and FRONTEND_URL on the backend.'),
       { status: 503, expose: true }
     );
+  }
+}
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+async function sendEmail({ to, subject, html }) {
+  try {
+    const info = await transporter.sendMail({
+      from: `"Tap & Go" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log('Email sent successfully:', info.messageId);
+    return info;
+  } catch (error) {
+    console.error('Email sending failed:', error);
+    throw error;
   }
 }
 
@@ -46,47 +71,21 @@ async function sendStaffPasswordReset({ email, name, role, token }) {
 
 async function sendStaffAccessEmail({ email, name, role, token, mode, subject, description, action }) {
   ensureInvitationConfigured();
-  const from = process.env.EMAIL_FROM;
   const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
   const setupUrl = `${frontendUrl}/#setupToken=${encodeURIComponent(token)}&mode=${mode}`;
-  const safeName = escapeHtml(name || role);
-  const safeEmail = escapeHtml(email);
-  const safeSetupUrl = escapeHtml(setupUrl);
-  const safeDescription = escapeHtml(description);
-  const safeAction = escapeHtml(action);
 
-  const html = `<p>Hello ${safeName},</p><p>${safeDescription}</p><p><strong>Login email:</strong> ${safeEmail}</p><p><a href="${safeSetupUrl}">${safeAction}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`;
+  const html = `<p>Hello ${name || role},</p><p>${description}</p><p><strong>Login email:</strong> ${email}</p><p><a href="${setupUrl}">${action}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`;
 
-  const text = `Hello ${name || role},\n\n${description}\n\n${setupUrl}\n\nThis one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with ${email}. For your security, we never send passwords by email.\n\nIf you were not expecting this email, contact your administrator.`;
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from,
-      to: [email],
-      subject,
-      html,
-      text
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Resend API error: ${response.status} ${error}`);
-  }
+  await sendEmail({ to: email, subject, html });
 }
 
 function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
     .replace(/"/g, '\\"')
     .replace(/'/g, "'");
 }
 
-module.exports = { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffPasswordReset };
+module.exports = { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffPasswordReset, sendEmail };
