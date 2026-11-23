@@ -123,9 +123,16 @@ app.post('/api/admin/mobile-accounts/:id/password-reset', requireAdmin, async (r
   let session;
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Mobile account not found.' });
-    ensureInvitationConfigured();
-    const invite = createInvitationToken();
-    const replacementPasswordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
+    const providedPassword = String(req.body?.password || '');
+    const useProvidedPassword = Boolean(providedPassword);
+    if (useProvidedPassword && (providedPassword.length < 12 || providedPassword.length > 1024)) {
+      return res.status(400).json({ error: 'Password must be at least 12 characters.' });
+    }
+    if (!useProvidedPassword) {
+      ensureInvitationConfigured();
+    }
+    const invite = useProvidedPassword ? null : createInvitationToken();
+    const replacementPasswordHash = useProvidedPassword ? hashPassword(providedPassword) : hashPassword(crypto.randomBytes(32).toString('hex'));
     let account;
     let name;
     let setupPending;
@@ -157,23 +164,29 @@ app.post('/api/admin/mobile-accounts/:id/password-reset', requireAdmin, async (r
         await Profile.updateOne({ _id: profile._id }, { $set: { passwordHash: replacementPasswordHash } }, { session });
       }
       account.passwordHash = replacementPasswordHash;
-      account.inviteTokenHash = invite.tokenHash;
-      account.inviteExpiresAt = invite.expiresAt;
-      account.setupPending = true;
+      if (!useProvidedPassword) {
+        account.inviteTokenHash = invite.tokenHash;
+        account.inviteExpiresAt = invite.expiresAt;
+        account.setupPending = true;
+      } else {
+        account.setupPending = false;
+      }
       account.sessionVersion += 1;
       await account.save({ session });
     });
     await session.endSession();
     session = null;
     io.in(`mobile:${account._id}`).disconnectSockets(true);
-    const sendAccessEmail = setupPending ? sendStaffInvitationAsync : sendStaffPasswordResetAsync;
-    sendAccessEmail({
-      email: account.email,
-      name,
-      role: account.role,
-      token: invite.token
-    });
-    res.json({ success: true, email: account.email, setupPending });
+    if (!useProvidedPassword && invite) {
+      const sendAccessEmail = setupPending ? sendStaffInvitationAsync : sendStaffPasswordResetAsync;
+      sendAccessEmail({
+        email: account.email,
+        name,
+        role: account.role,
+        token: invite.token
+      });
+    }
+    res.json({ success: true, email: account.email, setupPending: !useProvidedPassword });
   } catch (error) { apiError(res, error); }
   finally { if (session) await session.endSession(); }
 });
@@ -181,7 +194,8 @@ app.patch('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
   try {
     const account = await MobileAccount.findById(req.params.id);
     if (!account) return res.status(404).json({ error: 'Mobile account not found.' });
-    if (req.body?.password !== undefined) return res.status(400).json({ error: 'Use the password reset action to email a secure reset link.' });
+    const password = req.body?.password;
+    const useProvidedPassword = Boolean(password);
     const updates = {};
     if (account.role === 'superagent') {
       if (req.body?.name !== undefined) {
@@ -233,7 +247,13 @@ app.patch('/api/admin/mobile-accounts/:id', requireAdmin, async (req, res) => {
       if (agents.length !== managedAgentIds.length) return res.status(400).json({ error: 'Every assigned agent must be active.' });
       updates.managedAgents = managedAgentIds;
     }
-    if (!Object.keys(updates).length) return res.status(400).json({ error: 'Provide an account status or agent assignment update.' });
+    if (useProvidedPassword) {
+      if (password.length < 12 || password.length > 1024) return res.status(400).json({ error: 'Password must be at least 12 characters.' });
+      account.passwordHash = hashPassword(password);
+      account.setupPending = false;
+      account.sessionVersion += 1;
+    }
+    if (!Object.keys(updates).length && !useProvidedPassword) return res.status(400).json({ error: 'Provide an account status or agent assignment update.' });
     Object.assign(account, updates);
     account.sessionVersion += 1;
     await account.save();
