@@ -196,7 +196,7 @@ function createAuthHelpers(context) {
   function apiError(res, error) {
     console.error(error);
     const status = error.status || ((error.name === 'CastError' || error.name === 'ValidationError') ? 400 : (error.code === 11000 ? 409 : 500));
-    res.status(status).json({ error: status < 500 ? error.message : 'Internal server error' });
+    res.status(status).json({ error: status < 500 || error.expose === true ? error.message : 'Internal server error' });
   }
 
   return {

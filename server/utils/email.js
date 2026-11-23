@@ -14,7 +14,7 @@ function ensureInvitationConfigured() {
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM || !process.env.FRONTEND_URL) {
     throw Object.assign(
       new Error('Email invitations are not configured. Set RESEND_API_KEY, EMAIL_FROM, and FRONTEND_URL on the backend.'),
-      { status: 503 }
+      { status: 503, expose: true }
     );
   }
 }
