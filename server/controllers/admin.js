@@ -27,14 +27,18 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
     const role = req.body?.role;
     const email = String(req.body?.email || '').trim().toLowerCase();
     const recordId = String(req.body?.recordId || '');
+    const providedPassword = String(req.body?.password || '');
     if (!['agent', 'distributor', 'superagent'].includes(role)) return res.status(400).json({ error: 'Choose an agent, distributor, or Superagent role.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return res.status(400).json({ error: 'Enter a valid email address.' });
-    ensureInvitationConfigured();
+    if (providedPassword && (providedPassword.length < 12 || providedPassword.length > 1024)) {
+      return res.status(400).json({ error: 'Password must be at least 12 characters.' });
+    }
     const [adminExists, commuterExists] = await Promise.all([
       AdminProfile.exists({ email }),
       CommuterAccount.exists({ email })
     ]);
     if (adminExists || commuterExists) return res.status(409).json({ error: 'This email address is already in use.' });
+    const useProvidedPassword = Boolean(providedPassword);
     if (role === 'superagent') {
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       const managedAgentIds = Array.isArray(req.body?.managedAgentIds) ? [...new Set(req.body.managedAgentIds.map(String))] : [];
@@ -46,24 +50,29 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
       ]);
       if (assigned) return res.status(409).json({ error: 'One or more agents are already assigned to another active Superagent.' });
       if (agents.length !== managedAgentIds.length) return res.status(400).json({ error: 'Every assigned agent must be active.' });
-      const invite = createInvitationToken();
+      const passwordHash = useProvidedPassword ? hashPassword(providedPassword) : hashPassword(crypto.randomBytes(32).toString('hex'));
       const [superagent] = await MobileAccount.create([{
         role,
         name,
         managedAgents: managedAgentIds,
         email,
-        passwordHash: hashPassword(crypto.randomBytes(32).toString('hex')),
-        inviteTokenHash: invite.tokenHash,
-        inviteExpiresAt: invite.expiresAt,
-        setupPending: true
+        passwordHash,
+        inviteTokenHash: useProvidedPassword ? undefined : (() => { const invite = createInvitationToken(); return invite.tokenHash; })(),
+        inviteExpiresAt: useProvidedPassword ? undefined : (() => { const invite = createInvitationToken(); return invite.expiresAt; })(),
+        setupPending: !useProvidedPassword
       }]);
-      sendStaffInvitationAsync({ email, name, role, token: invite.token });
-      return res.status(201).json({ id: String(superagent._id), role, name, email, active: superagent.active });
+      if (!useProvidedPassword) {
+        const invite = createInvitationToken();
+        superagent.inviteTokenHash = invite.tokenHash;
+        superagent.inviteExpiresAt = invite.expiresAt;
+        await superagent.save();
+        sendStaffInvitationAsync({ email, name, role, token: invite.token });
+      }
+      return res.status(201).json({ id: String(superagent._id), role, name, email, active: superagent.active, setupPending: !useProvidedPassword });
     }
     if (!mongoose.isValidObjectId(recordId)) return res.status(400).json({ error: 'Choose an existing profile.' });
     const Model = role === 'agent' ? Agent : Distributor;
-    const invite = createInvitationToken();
-    const passwordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
+    const passwordHash = useProvidedPassword ? hashPassword(providedPassword) : hashPassword(crypto.randomBytes(32).toString('hex'));
     const record = await Model.findById(recordId).select('_id name');
     if (!record) {
       const error = new Error('The selected profile was not found.');
@@ -71,17 +80,23 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
       throw error;
     }
     const profileName = record.name;
+    let invite = null;
+    if (!useProvidedPassword) {
+      invite = createInvitationToken();
+    }
     const account = await MobileAccount.create({
       role,
       [role]: record._id,
       email,
       passwordHash,
-      inviteTokenHash: invite.tokenHash,
-      inviteExpiresAt: invite.expiresAt,
-      setupPending: true
+      inviteTokenHash: invite?.tokenHash,
+      inviteExpiresAt: invite?.expiresAt,
+      setupPending: !useProvidedPassword
     });
-    sendStaffInvitationAsync({ email, name: profileName, role, token: invite.token });
-    res.status(201).json({ id: String(account._id), role: account.role, email: account.email, active: account.active });
+    if (!useProvidedPassword && invite) {
+      sendStaffInvitationAsync({ email, name: profileName, role, token: invite.token });
+    }
+    res.status(201).json({ id: String(account._id), role: account.role, email: account.email, active: account.active, setupPending: !useProvidedPassword });
   } catch (error) { apiError(res, error); }
 });
 app.post('/api/admin/mobile-accounts/:id/invitation', requireAdmin, async (req, res) => {
@@ -278,7 +293,7 @@ function mobileCredentialsInput(body = {}) {
 
 app.post('/api/admin/agents', requireAdmin, async (req, res) => {
   try {
-    const { email } = mobileCredentialsInput(req.body);
+    const { email, password } = mobileCredentialsInput(req.body);
     const updates = adminProfileInput(req.body, 'agent');
     const [adminExists, commuterExists, existingAccount] = await Promise.all([
       AdminProfile.exists({ email }),
@@ -313,9 +328,12 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
     if (superagentId && !mongoose.isValidObjectId(superagentId)) return res.status(400).json({ error: 'Choose a valid active Superagent.' });
     const openingFloat = Number(req.body?.openingFloat ?? 0);
     if (!Number.isFinite(openingFloat) || openingFloat < 0) return res.status(400).json({ error: 'Opening float must be a non-negative amount.' });
-    ensureInvitationConfigured();
-    const invite = createInvitationToken();
-    const passwordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
+    const useProvidedPassword = Boolean(password);
+    if (!useProvidedPassword) {
+      ensureInvitationConfigured();
+    }
+    const invite = useProvidedPassword ? null : createInvitationToken();
+    const passwordHash = useProvidedPassword ? hashPassword(password) : hashPassword(crypto.randomBytes(32).toString('hex'));
     let agent;
     let account;
     let transaction;
@@ -336,7 +354,7 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
       });
       account = await MobileAccount.create({
         role: 'agent', agent: agent._id, email, passwordHash,
-        inviteTokenHash: invite.tokenHash, inviteExpiresAt: invite.expiresAt, setupPending: true
+        inviteTokenHash: invite?.tokenHash, inviteExpiresAt: invite?.expiresAt, setupPending: !useProvidedPassword
       });
       if (openingFloat > 0) {
         transaction = await Transaction.create({
@@ -377,7 +395,9 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
       if (cleanupErrors.length) console.error('Agent creation rollback was incomplete:', cleanupErrors);
       throw error;
     }
-    sendStaffInvitationAsync({ email, name: agent.name, role: 'agent', token: invite.token });
+    if (!useProvidedPassword && invite) {
+      sendStaffInvitationAsync({ email, name: agent.name, role: 'agent', token: invite.token });
+    }
     broadcast('agent:telemetry', agent);
     let warning;
     if (agent.floatBalance <= lowFloatThreshold(agent)) {
@@ -390,7 +410,7 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
     }
     res.status(201).json({
       profile: agent,
-      account: { id: String(account._id), role: account.role, email: account.email, active: account.active },
+      account: { id: String(account._id), role: account.role, email: account.email, active: account.active, setupPending: !useProvidedPassword },
       ...(warning ? { warning } : {})
     });
   } catch (error) { apiError(res, error); }
@@ -398,11 +418,14 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/distributors', requireAdmin, async (req, res) => {
   try {
-    const { email } = mobileCredentialsInput(req.body);
+    const { email, password } = mobileCredentialsInput(req.body);
     const updates = adminProfileInput(req.body, 'distributor');
-    ensureInvitationConfigured();
-    const invite = createInvitationToken();
-    const passwordHash = hashPassword(crypto.randomBytes(32).toString('hex'));
+    const useProvidedPassword = Boolean(password);
+    if (!useProvidedPassword) {
+      ensureInvitationConfigured();
+    }
+    const invite = useProvidedPassword ? null : createInvitationToken();
+    const passwordHash = useProvidedPassword ? hashPassword(password) : hashPassword(crypto.randomBytes(32).toString('hex'));
     let distributor;
     let account;
     try {
@@ -416,7 +439,7 @@ app.post('/api/admin/distributors', requireAdmin, async (req, res) => {
       });
       account = await MobileAccount.create({
         role: 'distributor', distributor: distributor._id, email, passwordHash,
-        inviteTokenHash: invite.tokenHash, inviteExpiresAt: invite.expiresAt, setupPending: true
+        inviteTokenHash: invite?.tokenHash, inviteExpiresAt: invite?.expiresAt, setupPending: !useProvidedPassword
       });
     } catch (error) {
       if (account) {
@@ -429,11 +452,13 @@ app.post('/api/admin/distributors', requireAdmin, async (req, res) => {
       }
       throw error;
     }
-    sendStaffInvitationAsync({ email, name: distributor.name, role: 'distributor', token: invite.token });
+    if (!useProvidedPassword && invite) {
+      sendStaffInvitationAsync({ email, name: distributor.name, role: 'distributor', token: invite.token });
+    }
     broadcast('distributor:location', distributor);
     res.status(201).json({
       profile: distributor,
-      account: { id: String(account._id), role: account.role, email: account.email, active: account.active }
+      account: { id: String(account._id), role: account.role, email: account.email, active: account.active, setupPending: !useProvidedPassword }
     });
   } catch (error) { apiError(res, error); }
 });
@@ -443,9 +468,13 @@ app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req,
   try {
     if (req.body?.password !== undefined) return res.status(400).json({ error: 'Use the password reset action to email a secure reset link.' });
     const updates = adminProfileInput(req.body, role);
-    const { email } = mobileCredentialsInput(req.body);
+    const { email, password } = mobileCredentialsInput(req.body);
     const Model = role === 'agent' ? Agent : Distributor;
-    const invite = createInvitationToken();
+    const useProvidedPassword = Boolean(password);
+    if (!useProvidedPassword) {
+      ensureInvitationConfigured();
+    }
+    const invite = useProvidedPassword ? null : createInvitationToken();
     const session = await mongoose.startSession();
     let profile;
     let account;
@@ -468,27 +497,27 @@ app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req,
           account.sessionVersion += 1;
           await account.save({ session });
         } else {
-          ensureInvitationConfigured();
+          const passwordHash = useProvidedPassword ? hashPassword(password) : hashPassword(crypto.randomBytes(32).toString('hex'));
           [account] = await MobileAccount.create([{
             role,
             [role]: profile._id,
             email,
-            passwordHash: hashPassword(crypto.randomBytes(32).toString('hex')),
-            inviteTokenHash: invite.tokenHash,
-            inviteExpiresAt: invite.expiresAt,
-            setupPending: true
+            passwordHash,
+            inviteTokenHash: invite?.tokenHash,
+            inviteExpiresAt: invite?.expiresAt,
+            setupPending: !useProvidedPassword
           }], { session });
-          sendInvitation = true;
+          sendInvitation = !useProvidedPassword;
         }
       });
     } finally { await session.endSession(); }
-    if (sendInvitation) {
+    if (sendInvitation && invite) {
       sendStaffInvitationAsync({ email, name: profile.name, role, token: invite.token });
     }
     if (account) io.in(`mobile:${account._id}`).disconnectSockets(true);
     if (role === 'agent') broadcast('agent:telemetry', profile);
     else broadcast('distributor:location', profile);
-    res.json({ profile, account: account ? { id: String(account._id), role: account.role, email: account.email, active: account.active } : null });
+    res.json({ profile, account: account ? { id: String(account._id), role: account.role, email: account.email, active: account.active, setupPending: sendInvitation } : null });
   } catch (error) { apiError(res, error); }
 });
 
