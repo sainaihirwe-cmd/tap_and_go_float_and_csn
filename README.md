@@ -164,3 +164,5 @@ The backend lives in `server/` and is organized by responsibility:
 - `server/seed.js` seeds local development data.
 
 Controller modules export a registration function and receive shared models, middleware, services, and Express/Socket.IO instances from `server/index.js`. Keep route paths and middleware order stable when adding endpoints. Start the API from the repository root with `npm run dev:api` or `npm start`.
+#   D e p l o y   t r i g g e r  
+ 
