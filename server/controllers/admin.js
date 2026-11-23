@@ -1,6 +1,6 @@
 module.exports = (context) => {
   const { finishAgentShift, finishDistributorShift } = require('../utils/shifts');
-  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, notifyLowFloat, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError, createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffPasswordReset } = context;
+  const { app, io, mongoose, crypto, axios, getRoute, Agent, Distributor, Alert, Dispatch, Transaction, FloatSettlement, CommuterLog, OperationalEvent, AdminProfile, MobileAccount, CommuterAccount, DistributorInbox, SuperagentInbox, SuperagentDeletionRequest, lowFloatThreshold, adminEmail, adminPassword, authSecret, allowedOrigins, sosThreshold, distributorLocationMaxAgeMs, dispatchSearchRadiusMeters, bankSlipUpload, validPoint, mobileProfileUpdates, publicIdQuery, broadcast, notifyAssignedDistributor, notifyLowFloat, issueAdminSession, issueMobileSession, verifySignedToken, requireMobile, mobileEntityQuery, sessionFromToken, sessionFromRequest, requireAdmin, hashPassword, passwordMatchesHash, mobileAccountView, backfillProfilePasswordHashes, passwordMatchesConfig, setAdminCookie, apiError, createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffInvitationAsync, sendStaffPasswordReset, sendStaffPasswordResetAsync } = context;
 app.get('/api/admin/mobile-accounts', requireAdmin, async (_req, res) => {
   try {
     const [accounts, agents, distributors] = await Promise.all([
@@ -57,12 +57,7 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
         inviteExpiresAt: invite.expiresAt,
         setupPending: true
       }]);
-      try {
-        await sendStaffInvitation({ email, name, role, token: invite.token });
-      } catch (error) {
-        console.error('Unable to deliver Superagent invitation:', error.message);
-        return res.status(502).json({ error: `The account was created, but its invitation email could not be sent. Resend the invitation from this page. ${error.message}`, accountCreated: true, id: String(superagent._id) });
-      }
+      sendStaffInvitationAsync({ email, name, role, token: invite.token });
       return res.status(201).json({ id: String(superagent._id), role, name, email, active: superagent.active });
     }
     if (!mongoose.isValidObjectId(recordId)) return res.status(400).json({ error: 'Choose an existing profile.' });
@@ -85,12 +80,7 @@ app.post('/api/admin/mobile-accounts', requireAdmin, async (req, res) => {
       inviteExpiresAt: invite.expiresAt,
       setupPending: true
     });
-    try {
-      await sendStaffInvitation({ email, name: profileName, role, token: invite.token });
-    } catch (error) {
-      console.error(`Unable to deliver ${role} invitation:`, error.message);
-      return res.status(502).json({ error: `The account was created, but its invitation email could not be sent. Resend the invitation from this page. ${error.message}`, accountCreated: true, id: String(account._id) });
-    }
+    sendStaffInvitationAsync({ email, name: profileName, role, token: invite.token });
     res.status(201).json({ id: String(account._id), role: account.role, email: account.email, active: account.active });
   } catch (error) { apiError(res, error); }
 });
@@ -103,7 +93,7 @@ app.post('/api/admin/mobile-accounts/:id/invitation', requireAdmin, async (req, 
     account.inviteTokenHash = invite.tokenHash;
     account.inviteExpiresAt = invite.expiresAt;
     await account.save();
-    await sendStaffInvitation({
+    sendStaffInvitationAsync({
       email: account.email,
       name: account.name || account.role,
       role: account.role,
@@ -111,8 +101,7 @@ app.post('/api/admin/mobile-accounts/:id/invitation', requireAdmin, async (req, 
     });
     res.json({ success: true, email: account.email });
   } catch (error) {
-    console.error('Unable to resend mobile account invitation:', error.message);
-    res.status(error.status || 502).json({ error: `Unable to send the account invitation. ${error.message}` });
+    apiError(res, error);
   }
 });
 app.post('/api/admin/mobile-accounts/:id/password-reset', requireAdmin, async (req, res) => {
@@ -162,18 +151,13 @@ app.post('/api/admin/mobile-accounts/:id/password-reset', requireAdmin, async (r
     await session.endSession();
     session = null;
     io.in(`mobile:${account._id}`).disconnectSockets(true);
-    try {
-      const sendAccessEmail = setupPending ? sendStaffInvitation : sendStaffPasswordReset;
-      await sendAccessEmail({
-        email: account.email,
-        name,
-        role: account.role,
-        token: invite.token
-      });
-    } catch (error) {
-      console.error(`Unable to deliver ${account.role} access email:`, error.message);
-      return res.status(502).json({ error: `The old password has been revoked, but the access email could not be delivered. Try sending a new link. ${error.message}` });
-    }
+    const sendAccessEmail = setupPending ? sendStaffInvitationAsync : sendStaffPasswordResetAsync;
+    sendAccessEmail({
+      email: account.email,
+      name,
+      role: account.role,
+      token: invite.token
+    });
     res.json({ success: true, email: account.email, setupPending });
   } catch (error) { apiError(res, error); }
   finally { if (session) await session.endSession(); }
@@ -316,12 +300,7 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
         existingAccount.inviteTokenHash = invite.tokenHash;
         existingAccount.inviteExpiresAt = invite.expiresAt;
         await existingAccount.save();
-        try {
-          await sendStaffInvitation({ email, name: existingAgent.name, role: 'agent', token: invite.token });
-        } catch (error) {
-          console.error('Unable to resend the existing agent invitation:', error.message);
-          return res.status(502).json({ error: `The Agent already exists, but its setup email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(existingAccount._id) });
-        }
+        sendStaffInvitationAsync({ email, name: existingAgent.name, role: 'agent', token: invite.token });
       }
       return res.status(200).json({
         profile: existingAgent,
@@ -398,12 +377,7 @@ app.post('/api/admin/agents', requireAdmin, async (req, res) => {
       if (cleanupErrors.length) console.error('Agent creation rollback was incomplete:', cleanupErrors);
       throw error;
     }
-    try {
-      await sendStaffInvitation({ email, name: agent.name, role: 'agent', token: invite.token });
-    } catch (error) {
-      console.error('Unable to deliver agent invitation:', error.message);
-      return res.status(502).json({ error: `The agent and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(account._id) });
-    }
+    sendStaffInvitationAsync({ email, name: agent.name, role: 'agent', token: invite.token });
     broadcast('agent:telemetry', agent);
     let warning;
     if (agent.floatBalance <= lowFloatThreshold(agent)) {
@@ -455,12 +429,7 @@ app.post('/api/admin/distributors', requireAdmin, async (req, res) => {
       }
       throw error;
     }
-    try {
-      await sendStaffInvitation({ email, name: distributor.name, role: 'distributor', token: invite.token });
-    } catch (error) {
-      console.error('Unable to deliver distributor invitation:', error.message);
-      return res.status(502).json({ error: `The distributor and login were created, but the invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(account._id) });
-    }
+    sendStaffInvitationAsync({ email, name: distributor.name, role: 'distributor', token: invite.token });
     broadcast('distributor:location', distributor);
     res.status(201).json({
       profile: distributor,
@@ -514,12 +483,7 @@ app.patch('/api/admin/:role(agents|distributors)/:id', requireAdmin, async (req,
       });
     } finally { await session.endSession(); }
     if (sendInvitation) {
-      try {
-        await sendStaffInvitation({ email, name: profile.name, role, token: invite.token });
-      } catch (error) {
-        console.error(`Unable to deliver ${role} invitation:`, error.message);
-        return res.status(502).json({ error: `The mobile account was created, but its invitation email could not be sent. Resend the invitation from Settings. ${error.message}`, accountCreated: true, id: String(account._id) });
-      }
+      sendStaffInvitationAsync({ email, name: profile.name, role, token: invite.token });
     }
     if (account) io.in(`mobile:${account._id}`).disconnectSockets(true);
     if (role === 'agent') broadcast('agent:telemetry', profile);

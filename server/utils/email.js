@@ -43,8 +43,26 @@ async function sendEmail({ to, subject, html }) {
   }
 }
 
+// Non-blocking email sending - returns immediately, sends in background
+function sendEmailAsync({ to, subject, html }) {
+  sendEmail({ to, subject, html }).catch(err => console.error('Background email failed:', err.message));
+}
+
 async function sendStaffInvitation({ email, name, role, token }) {
   await sendStaffAccessEmail({
+    email,
+    name,
+    role,
+    token,
+    mode: 'setup',
+    subject: `Set up your Tap & Go ${role} account`,
+    description: 'Your Tap & Go account is ready. Create your password using this one-time link:',
+    action: 'Set up your account'
+  });
+}
+
+async function sendStaffInvitationAsync({ email, name, role, token }) {
+  sendStaffAccessEmailAsync({
     email,
     name,
     role,
@@ -69,6 +87,19 @@ async function sendStaffPasswordReset({ email, name, role, token }) {
   });
 }
 
+async function sendStaffPasswordResetAsync({ email, name, role, token }) {
+  sendStaffAccessEmailAsync({
+    email,
+    name,
+    role,
+    token,
+    mode: 'reset',
+    subject: `Reset your Tap & Go ${role} password`,
+    description: 'An administrator requested a password reset for your Tap & Go account. Choose a new password using this one-time link:',
+    action: 'Reset your password'
+  });
+}
+
 async function sendStaffAccessEmail({ email, name, role, token, mode, subject, description, action }) {
   ensureInvitationConfigured();
   const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
@@ -77,6 +108,16 @@ async function sendStaffAccessEmail({ email, name, role, token, mode, subject, d
   const html = `<p>Hello ${name || role},</p><p>${description}</p><p><strong>Login email:</strong> ${email}</p><p><a href="${setupUrl}">${action}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`;
 
   await sendEmail({ to: email, subject, html });
+}
+
+function sendStaffAccessEmailAsync({ email, name, role, token, mode, subject, description, action }) {
+  ensureInvitationConfigured();
+  const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+  const setupUrl = `${frontendUrl}/#setupToken=${encodeURIComponent(token)}&mode=${mode}`;
+
+  const html = `<p>Hello ${name || role},</p><p>${description}</p><p><strong>Login email:</strong> ${email}</p><p><a href="${setupUrl}">${action}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`;
+
+  sendEmailAsync({ to: email, subject, html });
 }
 
 function escapeHtml(value) {
@@ -88,4 +129,4 @@ function escapeHtml(value) {
     .replace(/'/g, "'");
 }
 
-module.exports = { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffPasswordReset, sendEmail };
+module.exports = { createInvitationToken, ensureInvitationConfigured, sendStaffInvitation, sendStaffInvitationAsync, sendStaffPasswordReset, sendStaffPasswordResetAsync, sendEmail, sendEmailAsync };
