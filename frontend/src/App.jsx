@@ -272,6 +272,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage}){
     <label htmlFor="network-password">Password (optional, min 12 chars)</label><input id="network-password" type="password" maxLength="1024" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Leave blank to send setup link via email" />
     {error&&<div className="profile-form-error" role="alert">{error}</div>}
     <div className="profile-form-actions"><button type="button" className="subtle-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={busy}>{busy?'Saving...':record?'Save changes':`Create ${role} & login`}</button></div>
-   </form>
-  </section>
-}
+</form>
+   </section>
+  }
+export default App;
