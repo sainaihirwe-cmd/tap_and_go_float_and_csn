@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 
 function createInvitationToken() {
   const token = crypto.randomBytes(32).toString('hex');
@@ -55,28 +54,39 @@ async function sendStaffAccessEmail({ email, name, role, token, mode, subject, d
   const safeSetupUrl = escapeHtml(setupUrl);
   const safeDescription = escapeHtml(description);
   const safeAction = escapeHtml(action);
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.resend.com',
-    port: 465,
-    secure: true,
-    auth: { user: 'resend', pass: process.env.RESEND_API_KEY }
+
+  const html = `<p>Hello ${safeName},</p><p>${safeDescription}</p><p><strong>Login email:</strong> ${safeEmail}</p><p><a href="${safeSetupUrl}">${safeAction}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`;
+
+  const text = `Hello ${name || role},\n\n${description}\n\n${setupUrl}\n\nThis one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with ${email}. For your security, we never send passwords by email.\n\nIf you were not expecting this email, contact your administrator.`;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject,
+      html,
+      text
+    })
   });
-  await transporter.sendMail({
-    from,
-    to: email,
-    subject,
-    text: `Hello ${name || role},\n\n${description}\n\n${setupUrl}\n\nThis one-time link expires in 24 hours. After choosing your password, sign in to the Tap & Go mobile app with ${email}. For your security, we never send passwords by email.\n\nIf you were not expecting this email, contact your administrator.`,
-    html: `<p>Hello ${safeName},</p><p>${safeDescription}</p><p><strong>Login email:</strong> ${safeEmail}</p><p><a href="${safeSetupUrl}">${safeAction}</a></p><p>This one-time link expires in 24 hours. After choosing your password, sign in to the Tap &amp; Go mobile app with the login email above. For your security, we never send passwords by email.</p><p>If you were not expecting this email, contact your administrator.</p>`
-  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Resend API error: ${response.status} ${error}`);
+  }
 }
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
+    '&': '&',
+    '<': '<',
+    '>': '>',
+    '"': '"',
+    "'": '''
   })[character]);
 }
 
