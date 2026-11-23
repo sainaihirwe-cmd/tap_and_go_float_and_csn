@@ -473,8 +473,9 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
  const [data,setData]=useState({accounts:[],agents:[],distributors:[]});
  const [recordId,setRecordId]=useState('');
  const [email,setEmail]=useState('');
- const [superagentName,setSuperagentName]=useState('');const [managedAgentIds,setManagedAgentIds]=useState([]);
- const [editingScope,setEditingScope]=useState(null);
+const [superagentName,setSuperagentName]=useState('');const [managedAgentIds,setManagedAgentIds]=useState([]);
+  const [password,setPassword]=useState('');
+  const [editingScope,setEditingScope]=useState(null);
  const [editingSuperagent,setEditingSuperagent]=useState(null);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const refresh=async()=>{
@@ -495,21 +496,21 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
   event.preventDefault();setError('');setBusy(true);
   try{
    const body=role==='superagent'
-    ?{role,name:superagentName,managedAgentIds,email}
-    :{role,recordId,email};
+    ?{role,name:superagentName,managedAgentIds,email,password}
+    :{role,recordId,email,password};
    const response=await apiFetch('/api/admin/mobile-accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
    const result=await response.json();
    if(!response.ok){
-    if(result.accountCreated){
-     setEmail('');setSuperagentName('');setManagedAgentIds([]);
-     onMessage(result.error||'The account was created, but its invitation could not be sent.');
+if(result.accountCreated){
+      setEmail('');setSuperagentName('');setManagedAgentIds([]);setPassword('');
+      onMessage(result.error||'The account was created, but its invitation could not be sent.');
      try{await refresh()}catch(problem){setError(`The account was created, but the account list could not be refreshed: ${problem.message}`)}
      return;
     }
     throw Error(result.error||'Unable to create mobile account.');
    }
-   setEmail('');setSuperagentName('');setManagedAgentIds([]);
-   onMessage(`Account created. A secure setup link was emailed to ${result.email}.`);
+setEmail('');setSuperagentName('');setManagedAgentIds([]);setPassword('');
+    onMessage(`Account created. A secure setup link was emailed to ${result.email}.`);
    try{await refresh()}catch(problem){setError(`The account was created, but the account list could not be refreshed: ${problem.message}`)}
   }catch(problem){setError(problem.message)}finally{setBusy(false)}
  };
@@ -578,8 +579,9 @@ function MobileAccounts({onMessage,role,onRoleChange,standalone=false}){
     <label htmlFor="mobile-account-profile">Link to profile</label><select id="mobile-account-profile" required value={recordId} onChange={event=>setRecordId(event.target.value)}><option value="">Select a {role}</option>{available.map(record=><option key={record._id} value={record._id}>{record.name}  -  {role==='agent'?record.agent_id:record.distributor_id}</option>)}</select>
     {!available.length&&<p>No unlinked {role} profiles available.</p>}
    </>}
-   <label htmlFor="mobile-account-email">Sign-in email</label><input id="mobile-account-email" type="email" required maxLength="254" value={email} onChange={event=>setEmail(event.target.value)} placeholder="user@company.com"/>
-   {error&&<div className="profile-form-error" role="alert">{error}</div>}
+<label htmlFor="mobile-account-email">Sign-in email</label><input id="mobile-account-email" type="email" required maxLength="254" value={email} onChange={event=>setEmail(event.target.value)} placeholder="user@company.com"/>
+    <label htmlFor="mobile-account-password">Password (optional, min 12 chars)</label><input id="mobile-account-password" type="password" maxLength="1024" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Leave blank to send setup link via email" />
+    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button className="primary-button" disabled={busy||(role==='superagent'?false:!available.length)}>{busy?'Creating...':role==='superagent'?'Create Superagent account':'Create mobile login'}</button></div>
   </form>
   <div className="mobile-account-list-heading"><h3>{standalone?'Existing Superagents':'Existing mobile accounts'}</h3><span>{visibleAccounts.length}</span></div>
