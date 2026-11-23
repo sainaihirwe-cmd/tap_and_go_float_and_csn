@@ -640,17 +640,18 @@ setEmail('');setSuperagentName('');setManagedAgentIds([]);setPassword('');
 }
 
 function NetworkProfileForm({role,record,onCancel,onSaved,onMessage}){
- const [name,setName]=useState(record?.name||'');
- const [phone,setPhone]=useState(record?.phone||'');
- const [place,setPlace]=useState(record?.place||'');
- const [zone,setZone]=useState(record?.zone||'');
- const [openingFloat,setOpeningFloat]=useState('0');
- const [superagents,setSuperagents]=useState([]);
- const [superagentId,setSuperagentId]=useState('');
- const [email,setEmail]=useState(record?.mobileEmail||'');
- const [error,setError]=useState('');
- const [busy,setBusy]=useState(false);
- const kind=role==='agent'?'agents':'distributors';
+  const [name,setName]=useState(record?.name||'');
+  const [phone,setPhone]=useState(record?.phone||'');
+  const [place,setPlace]=useState(record?.place||'');
+  const [zone,setZone]=useState(record?.zone||'');
+  const [openingFloat,setOpeningFloat]=useState('0');
+  const [superagents,setSuperagents]=useState([]);
+  const [superagentId,setSuperagentId]=useState('');
+  const [email,setEmail]=useState(record?.mobileEmail||'');
+  const [password,setPassword]=useState('');
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const kind=role==='agent'?'agents':'distributors';
  useEffect(()=>{
   if(record||role!=='agent')return;
   let active=true;
@@ -663,7 +664,7 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage}){
  const submit=async event=>{
   event.preventDefault();setError('');setBusy(true);
   try{
-   const body={name,phone,place,zone,email};
+   const body={name,phone,place,zone,email,password};
    let url=`/api/admin/${kind}`;
    let method='POST';
    if(record){url+=`/${record._id}`;method='PATCH'}
@@ -687,8 +688,9 @@ function NetworkProfileForm({role,record,onCancel,onSaved,onMessage}){
    <label htmlFor="network-zone">{role==='agent'?'Agent zone':'Distributor zone'}</label><input id="network-zone" maxLength="80" value={zone} onChange={event=>setZone(event.target.value)} placeholder="Enter zone manually"/>
   {!record&&role==='agent'&&<><label htmlFor="network-opening-float">Opening float (RWF)</label><input id="network-opening-float" type="number" min="0" step="1" value={openingFloat} onChange={event=>setOpeningFloat(event.target.value)}/></>}
   {!record&&role==='agent'&&<><label htmlFor="network-superagent">Assign Superagent (optional)</label><select id="network-superagent" value={superagentId} onChange={event=>setSuperagentId(event.target.value)}><option value="">Leave unassigned</option>{superagents.map(account=><option key={account.id} value={account.id}>{account.profile?.name||account.email}</option>)}</select><p className="form-hint">A distributor is assigned to a replenishment task after the agent and distributor share recent GPS locations.</p></>}
-   <label htmlFor="network-email">Sign-in email</label><input id="network-email" type="email" autoComplete="email" maxLength="254" required value={email} onChange={event=>setEmail(event.target.value)}/>
-   {error&&<div className="profile-form-error" role="alert">{error}</div>}
+<label htmlFor="network-email">Sign-in email</label><input id="network-email" type="email" autoComplete="email" maxLength="254" required value={email} onChange={event=>setEmail(event.target.value)}/>
+    <label htmlFor="network-password">Password (optional, min 12 chars)</label><input id="network-password" type="password" maxLength="1024" value={password} onChange={event=>setPassword(event.target.value)} placeholder="Leave blank to send setup link via email" />
+    {error&&<div className="profile-form-error" role="alert">{error}</div>}
    <div className="profile-form-actions"><button type="button" className="subtle-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={busy}>{busy?'Saving...':record?'Save changes':`Create ${role} & login`}</button></div>
   </form>
  </section>
